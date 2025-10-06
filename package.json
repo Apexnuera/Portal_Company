@@ -1,0 +1,21 @@
+{
+  "name": "company-portal",
+  "version": "1.0.0",
+  "description": "Company Portal Flutter Web Application",
+  "scripts": {
+    "serve": "flutter run -d chrome",
+    "build": "flutter build web",
+    "serve-build": "cd build/web && npx http-server -p 8080",
+    "clean": "flutter clean"
+  },
+  "keywords": [
+    "flutter",
+    "web",
+    "company-portal"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
