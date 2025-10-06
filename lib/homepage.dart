@@ -146,53 +146,103 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildNavigationMenu(BuildContext context) {
-    final menuItems = [
-      'Home',
-      'Alerts',
-      'Campus Commune',
-      'Buzz',
-      'Help & Support',
-      'Career',
-      'Login',
-    ];
-
     return Row(
-      children: menuItems.map((item) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-          child: TextButton(
-            onPressed: () {
-              // Handle navigation
-              _handleNavigation(context, item);
-            },
-            child: Text(
-              item,
-              style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+      children: [
+        _buildNavButton(context, 'Home'),
+        _buildNavButton(context, 'Alerts'),
+        _buildNavButton(context, 'Campus Commune'),
+        _buildNavButton(context, 'Buzz'),
+        _buildNavButton(context, 'Help & Support'),
+        _buildCareerDropdown(context),
+        _buildNavButton(context, 'Login'),
+      ],
+    );
+  }
+
+  Widget _buildNavButton(BuildContext context, String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: TextButton(
+        onPressed: () {
+          _handleNavigation(context, label);
+        },
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCareerDropdown(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: PopupMenuButton<String>(
+        offset: const Offset(0, 50),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Career',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
-            ),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.arrow_drop_down,
+                color: Colors.black87,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+        itemBuilder: (BuildContext context) => [
+          PopupMenuItem<String>(
+            value: 'Jobs',
+            child: Row(
+              children: [
+                Icon(Icons.work_outline, color: Color(0xFFFF782B), size: 20),
+                const SizedBox(width: 12),
+                Text('Jobs'),
+              ],
             ),
           ),
-        );
-      }).toList(),
+          PopupMenuItem<String>(
+            value: 'Internships',
+            child: Row(
+              children: [
+                Icon(Icons.school_outlined, color: Color(0xFFFF782B), size: 20),
+                const SizedBox(width: 12),
+                Text('Internships'),
+              ],
+            ),
+          ),
+        ],
+        onSelected: (String value) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$value - Coming Soon'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        },
+      ),
     );
   }
 
   void _showMobileMenu(BuildContext context) {
-    final menuItems = [
-      'Home',
-      'Alerts',
-      'Campus Commune',
-      'Buzz',
-      'Help & Support',
-      'Career',
-      'Login',
-    ];
-
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -200,10 +250,10 @@ class HomePage extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: menuItems.map((item) {
-              return ListTile(
+            children: [
+              ListTile(
                 title: Text(
-                  item,
+                  'Home',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -211,10 +261,112 @@ class HomePage extends StatelessWidget {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  _handleNavigation(context, item);
+                  _handleNavigation(context, 'Home');
                 },
-              );
-            }).toList(),
+              ),
+              ListTile(
+                title: Text(
+                  'Alerts',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleNavigation(context, 'Alerts');
+                },
+              ),
+              ListTile(
+                title: Text(
+                  'Campus Commune',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleNavigation(context, 'Campus Commune');
+                },
+              ),
+              ListTile(
+                title: Text(
+                  'Buzz',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleNavigation(context, 'Buzz');
+                },
+              ),
+              ListTile(
+                title: Text(
+                  'Help & Support',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleNavigation(context, 'Help & Support');
+                },
+              ),
+              ExpansionTile(
+                title: Text(
+                  'Career',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                children: [
+                  ListTile(
+                    leading: Icon(Icons.work_outline, color: Color(0xFFFF782B)),
+                    title: Text('Jobs'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Jobs - Coming Soon'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.school_outlined, color: Color(0xFFFF782B)),
+                    title: Text('Internships'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Internships - Coming Soon'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              ListTile(
+                title: Text(
+                  'Login',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleNavigation(context, 'Login');
+                },
+              ),
+            ],
           ),
         );
       },
@@ -223,12 +375,34 @@ class HomePage extends StatelessWidget {
 
   void _handleNavigation(BuildContext context, String item) {
     // Handle navigation logic here
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Navigating to $item'),
-        duration: Duration(seconds: 1),
-      ),
-    );
+    switch (item) {
+      case 'Alerts':
+        Navigator.pushNamed(context, '/alerts');
+        break;
+      case 'Campus Commune':
+        Navigator.pushNamed(context, '/campus-commune');
+        break;
+      case 'Buzz':
+        Navigator.pushNamed(context, '/buzz');
+        break;
+      case 'Help & Support':
+        Navigator.pushNamed(context, '/help-support');
+        break;
+      case 'Login':
+        Navigator.pushNamed(context, '/login');
+        break;
+      case 'Home':
+        // Already on home page, do nothing or refresh
+        break;
+      default:
+        // For other menu items, show a snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Navigating to $item'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+    }
   }
 
   double _getResponsiveFontSize(BuildContext context) {

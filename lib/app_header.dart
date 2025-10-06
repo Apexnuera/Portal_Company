@@ -1,0 +1,259 @@
+import 'package:flutter/material.dart';
+
+class AppHeader extends StatelessWidget {
+  const AppHeader({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isSmallScreen = MediaQuery.of(context).size.width < 800;
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 16.0 : 40.0,
+        vertical: 20.0,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: isSmallScreen
+          ? _buildMobileHeader(context)
+          : _buildDesktopHeader(context),
+    );
+  }
+
+  Widget _buildDesktopHeader(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildLogo(),
+        _buildNavigationMenu(context),
+      ],
+    );
+  }
+
+  Widget _buildMobileHeader(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildLogo(),
+        IconButton(
+          icon: const Icon(Icons.menu, size: 30),
+          onPressed: () => _showMobileMenu(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogo() {
+    return SizedBox(
+      height: 50,
+      child: Row(
+        children: [
+          Image.asset(
+            'assets/images/logo.png',
+            height: 50,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF782B),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'LOGO',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavigationMenu(BuildContext context) {
+    final items = [
+      'Home',
+      'Alerts',
+      'Campus Commune',
+      'Buzz',
+      'Help & Support',
+      'Career',
+      'Login',
+    ];
+    return Row(
+      children: items.map((label) {
+        if (label == 'Career') {
+          return _buildCareerDropdown(context);
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: TextButton(
+            onPressed: () => _handleNavigation(context, label),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCareerDropdown(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: PopupMenuButton<String>(
+        offset: const Offset(0, 50),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'Career',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              SizedBox(width: 4),
+              Icon(Icons.arrow_drop_down, color: Colors.black87, size: 20),
+            ],
+          ),
+        ),
+        itemBuilder: (context) => [
+          PopupMenuItem<String>(
+            value: 'Jobs',
+            child: Row(
+              children: const [
+                Icon(Icons.work_outline, color: Color(0xFFFF782B), size: 20),
+                SizedBox(width: 12),
+                Text('Jobs'),
+              ],
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'Internships',
+            child: Row(
+              children: const [
+                Icon(Icons.school_outlined, color: Color(0xFFFF782B), size: 20),
+                SizedBox(width: 12),
+                Text('Internships'),
+              ],
+            ),
+          ),
+        ],
+        onSelected: (value) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$value - Coming Soon'), duration: const Duration(seconds: 1)),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showMobileMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final label in ['Home','Alerts','Campus Commune','Buzz','Help & Support'])
+                ListTile(
+                  title: Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handleNavigation(context, label);
+                  },
+                ),
+              ExpansionTile(
+                title: const Text('Career', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.work_outline, color: Color(0xFFFF782B)),
+                    title: const Text('Jobs'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Jobs - Coming Soon'), duration: Duration(seconds: 1)),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.school_outlined, color: Color(0xFFFF782B)),
+                    title: const Text('Internships'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Internships - Coming Soon'), duration: Duration(seconds: 1)),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              ListTile(
+                title: const Text('Login', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleNavigation(context, 'Login');
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleNavigation(BuildContext context, String item) {
+    switch (item) {
+      case 'Alerts':
+        Navigator.pushNamed(context, '/alerts');
+        break;
+      case 'Campus Commune':
+        Navigator.pushNamed(context, '/campus-commune');
+        break;
+      case 'Buzz':
+        Navigator.pushNamed(context, '/buzz');
+        break;
+      case 'Help & Support':
+        Navigator.pushNamed(context, '/help-support');
+        break;
+      case 'Login':
+        Navigator.pushNamed(context, '/login');
+        break;
+      case 'Home':
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Navigating to $item'), duration: const Duration(seconds: 1)),
+        );
+    }
+  }
+}
