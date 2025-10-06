@@ -7,6 +7,9 @@ import 'help_support_page.dart';
 import 'login_page.dart';
 import 'employee_login_page.dart';
 import 'hr_login_page.dart';
+import 'change_password_page.dart';
+import 'jobs_listing_page.dart';
+import 'internships_listing_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,6 +37,9 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/login/employee': (context) => const EmployeeLoginPage(),
         '/login/hr': (context) => const HRLoginPage(),
+        '/change-password': (context) => const ChangePasswordPage(),
+        '/jobs': (context) => const JobsListingPage(),
+        '/internships': (context) => const InternshipsListingPage(),
       },
     );
   }

@@ -133,9 +133,7 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                           Center(
                             child: TextButton(
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Forgot Password - Coming Soon')),
-                                );
+                                Navigator.pushNamed(context, '/change-password');
                               },
                               style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
                               child: const Text('Forgot Password?'),

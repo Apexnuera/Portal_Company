@@ -231,12 +231,11 @@ class HomePage extends StatelessWidget {
           ),
         ],
         onSelected: (String value) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$value - Coming Soon'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          if (value == 'Jobs') {
+            Navigator.pushNamed(context, '/jobs');
+          } else if (value == 'Internships') {
+            Navigator.pushNamed(context, '/internships');
+          }
         },
       ),
     );
@@ -330,12 +329,7 @@ class HomePage extends StatelessWidget {
                     title: Text('Jobs'),
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Jobs - Coming Soon'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
+                      Navigator.pushNamed(context, '/jobs');
                     },
                   ),
                   ListTile(
@@ -343,12 +337,7 @@ class HomePage extends StatelessWidget {
                     title: Text('Internships'),
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Internships - Coming Soon'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
+                      Navigator.pushNamed(context, '/internships');
                     },
                   ),
                 ],

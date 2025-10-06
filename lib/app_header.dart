@@ -163,9 +163,11 @@ class AppHeader extends StatelessWidget {
           ),
         ],
         onSelected: (value) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$value - Coming Soon'), duration: const Duration(seconds: 1)),
-          );
+          if (value == 'Jobs') {
+            Navigator.pushNamed(context, '/jobs');
+          } else if (value == 'Internships') {
+            Navigator.pushNamed(context, '/internships');
+          }
         },
       ),
     );
@@ -199,9 +201,7 @@ class AppHeader extends StatelessWidget {
                     title: const Text('Jobs'),
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Jobs - Coming Soon'), duration: Duration(seconds: 1)),
-                      );
+                      Navigator.pushNamed(context, '/jobs');
                     },
                   ),
                   ListTile(
@@ -209,9 +209,7 @@ class AppHeader extends StatelessWidget {
                     title: const Text('Internships'),
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Internships - Coming Soon'), duration: Duration(seconds: 1)),
-                      );
+                      Navigator.pushNamed(context, '/internships');
                     },
                   ),
                 ],
