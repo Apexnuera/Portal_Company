@@ -142,12 +142,10 @@ class _HRLoginPageState extends State<HRLoginPage> {
                           Center(
                             child: TextButton(
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Registration - Coming Soon')),
-                                );
+                                Navigator.pushNamed(context, '/register/employee');
                               },
                               style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
-                              child: const Text('New Candidate? Register Here'),
+                              child: const Text('New Employee? Register Here'),
                             ),
                           ),
                               ],

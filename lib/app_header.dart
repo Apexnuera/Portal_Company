@@ -97,19 +97,26 @@ class AppHeader extends StatelessWidget {
           return _buildCareerDropdown(context);
         }
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          padding: const EdgeInsets.symmetric(horizontal: 10.0),
           child: TextButton(
             onPressed: () => _handleNavigation(context, label),
             style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_iconForLabel(label), color: Colors.black87, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -119,24 +126,26 @@ class AppHeader extends StatelessWidget {
 
   Widget _buildCareerDropdown(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      padding: const EdgeInsets.symmetric(horizontal: 10.0),
       child: PopupMenuButton<String>(
         offset: const Offset(0, 50),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: const [
+              Icon(Icons.work_outline, color: Colors.black87, size: 18),
+              SizedBox(width: 6),
               Text(
                 'Career',
                 style: TextStyle(
                   color: Colors.black87,
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 15,
                 ),
               ),
               SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down, color: Colors.black87, size: 20),
+              Icon(Icons.arrow_drop_down, color: Colors.black87, size: 18),
             ],
           ),
         ),
@@ -252,6 +261,25 @@ class AppHeader extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Navigating to $item'), duration: const Duration(seconds: 1)),
         );
+    }
+  }
+
+  IconData _iconForLabel(String label) {
+    switch (label) {
+      case 'Home':
+        return Icons.home_outlined;
+      case 'Alerts':
+        return Icons.notifications_outlined;
+      case 'Campus Commune':
+        return Icons.people_alt_outlined;
+      case 'Buzz':
+        return Icons.campaign_outlined;
+      case 'Help & Support':
+        return Icons.help_outline;
+      case 'Login':
+        return Icons.login;
+      default:
+        return Icons.circle_outlined;
     }
   }
 }

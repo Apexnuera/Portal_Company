@@ -10,6 +10,7 @@ import 'hr_login_page.dart';
 import 'change_password_page.dart';
 import 'jobs_listing_page.dart';
 import 'internships_listing_page.dart';
+import 'employee_registration_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -40,6 +41,7 @@ class MyApp extends StatelessWidget {
         '/change-password': (context) => const ChangePasswordPage(),
         '/jobs': (context) => const JobsListingPage(),
         '/internships': (context) => const InternshipsListingPage(),
+        '/register/employee': (context) => const EmployeeRegistrationPage(),
       },
     );
   }
