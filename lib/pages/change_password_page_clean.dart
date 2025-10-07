@@ -1,11 +1,51 @@
-1→import 'package:flutter/material.dart';
-    2→import 'widgets/app_header_clean.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../widgets/app_header_clean.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
 
   @override
-{{ ... }}
+  State<ChangePasswordPage> createState() => _ChangePasswordPageState();
+}
+
+class _ChangePasswordPageState extends State<ChangePasswordPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _oldController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  bool _obscureOld = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+
+  @override
+  void dispose() {
+    _oldController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          const AppHeader(),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isSmall = constraints.maxWidth < 600;
+                final compact = constraints.maxHeight < 620;
+                final cardWidth = isSmall ? constraints.maxWidth - 24 : 420.0;
+
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: cardWidth),
+                    child: Padding(
+                      padding: EdgeInsets.all(isSmall ? 12 : 20),
+                      child: Card(
                         elevation: 4,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -18,30 +58,16 @@ class ChangePasswordPage extends StatefulWidget {
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // Back Button to HR Login
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: TextButton.icon(
-                                    onPressed: () {
-                                      if (Navigator.canPop(context)) {
-                                        Navigator.pop(context);
-                                      } else {
-                                        Navigator.pushNamedAndRemoveUntil(context, '/login/hr', (route) => route.settings.name == '/home' || route.settings.name == '/login');
-                                      }
-                                    },
-                                    icon: const Icon(Icons.arrow_back, color: Color(0xFFFF782B)),
-                                    label: const Text('Back', style: TextStyle(color: Color(0xFFFF782B))),
-                                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                                  ),
-                                ),
+                                // Removed on-screen back button; browser back handled by GoRouter.
                                 const SizedBox(height: 8),
+
+                                // Header
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.lock_reset_outlined,
-                                        color: const Color(0xFFFF782B), size: isSmall ? 28 : 32),
+                                    Icon(Icons.lock_reset_outlined, color: const Color(0xFFFF782B), size: isSmall ? 28 : 32),
                                     const SizedBox(width: 8),
-{{ ... }}
+                                    Text(
                                       'Change Password',
                                       style: TextStyle(
                                         fontSize: isSmall ? 20 : 22,
@@ -52,6 +78,7 @@ class ChangePasswordPage extends StatefulWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 16),
+
                                 // Old Password
                                 TextFormField(
                                   controller: _oldController,
@@ -75,6 +102,7 @@ class ChangePasswordPage extends StatefulWidget {
                                   validator: (v) => (v == null || v.isEmpty) ? 'Please enter old password' : null,
                                 ),
                                 const SizedBox(height: 12),
+
                                 // New Password
                                 TextFormField(
                                   controller: _newController,
@@ -98,6 +126,7 @@ class ChangePasswordPage extends StatefulWidget {
                                   validator: (v) => (v == null || v.isEmpty) ? 'Please enter new password' : null,
                                 ),
                                 const SizedBox(height: 12),
+
                                 // Confirm New Password
                                 TextFormField(
                                   controller: _confirmController,
@@ -125,6 +154,7 @@ class ChangePasswordPage extends StatefulWidget {
                                   },
                                 ),
                                 const SizedBox(height: 16),
+
                                 SizedBox(
                                   height: 44,
                                   child: ElevatedButton(

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_header.dart';
+import 'widgets/app_header_clean.dart';
 
 class BuzzPage extends StatelessWidget {
   const BuzzPage({super.key});

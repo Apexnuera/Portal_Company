@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_header.dart';
+import 'widgets/app_header_clean.dart';
 
 class InternshipsListingPage extends StatelessWidget {
   const InternshipsListingPage({super.key});

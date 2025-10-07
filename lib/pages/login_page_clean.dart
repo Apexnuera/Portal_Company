@@ -1,5 +1,6 @@
-1→import 'package:flutter/material.dart';
-    2→import 'widgets/app_header_clean.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../widgets/app_header_clean.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -17,7 +18,6 @@ class LoginPage extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final maxW = constraints.maxWidth;
-                // Compute card width so two cards fit side-by-side with spacing and padding
                 final horizontalPadding = isSmallScreen ? 16.0 : 32.0;
                 final spacing = 16.0;
                 final availableForCards = (maxW - horizontalPadding * 2 - spacing);
@@ -25,34 +25,25 @@ class LoginPage extends StatelessWidget {
 
                 return Center(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: 1000,
-                    ),
+                    constraints: const BoxConstraints(maxWidth: 1000),
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: isSmallScreen ? 12 : 32),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.max,
                         children: [
-                          // Back Button to Home
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () {
-                                Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-                              },
-                              icon: const Icon(Icons.arrow_back, color: Color(0xFFFF782B)),
-                              label: const Text('Back', style: TextStyle(color: Color(0xFFFF782B))),
-                              style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                            ),
-                          ),
+                          // Back button removed to avoid redundant on-screen arrow;
+                          // browser back is handled by GoRouter history.
                           const SizedBox(height: 8),
+
                           // Header Icon
                           Icon(
                             Icons.login_outlined,
                             color: const Color(0xFFFF782B).withOpacity(0.8),
                           ),
-{{ ... }}
+
+                          const SizedBox(height: 8),
+
                           // Title
                           Text(
                             'Choose Login Type',
@@ -64,6 +55,7 @@ class LoginPage extends StatelessWidget {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 6),
+
                           // Subtitle
                           Text(
                             'Select your role to continue',
@@ -74,6 +66,7 @@ class LoginPage extends StatelessWidget {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 20),
+
                           // Two cards side-by-side
                           Wrap(
                             alignment: WrapAlignment.center,
@@ -87,9 +80,7 @@ class LoginPage extends StatelessWidget {
                                   title: 'Employee Login',
                                   subtitle: 'Access your employee portal',
                                   icon: Icons.person_outline,
-                                  onTap: () {
-                                    Navigator.pushNamed(context, '/login/employee');
-                                  },
+                                  onTap: () => context.push('/login/employee'),
                                   isSmallScreen: isSmallScreen,
                                 ),
                               ),
@@ -100,9 +91,7 @@ class LoginPage extends StatelessWidget {
                                   title: 'HR Login',
                                   subtitle: 'Access HR management portal',
                                   icon: Icons.admin_panel_settings_outlined,
-                                  onTap: () {
-                                    Navigator.pushNamed(context, '/login/hr');
-                                  },
+                                  onTap: () => context.push('/login/hr'),
                                   isSmallScreen: isSmallScreen,
                                 ),
                               ),
@@ -159,7 +148,7 @@ class LoginPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              
+
               // Text Content
               Expanded(
                 child: Column(
@@ -184,7 +173,7 @@ class LoginPage extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Arrow Icon
               Icon(
                 Icons.arrow_forward_ios,

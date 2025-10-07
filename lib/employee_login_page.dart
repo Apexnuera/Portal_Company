@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'app_header.dart';
+import 'package:go_router/go_router.dart';
+import 'widgets/app_header_clean.dart';
 
 class EmployeeLoginPage extends StatefulWidget {
   const EmployeeLoginPage({super.key});
@@ -132,9 +133,7 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                           const SizedBox(height: 10),
                           Center(
                             child: TextButton(
-                              onPressed: () {
-                                Navigator.pushNamed(context, '/change-password');
-                              },
+                              onPressed: () => context.push('/change-password'),
                               style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
                               child: const Text('Forgot Password?'),
                             ),
