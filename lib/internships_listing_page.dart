@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'widgets/app_header_clean.dart';
+import 'package:go_router/go_router.dart';
+import 'data/post_store.dart';
 
 class InternshipsListingPage extends StatelessWidget {
   const InternshipsListingPage({super.key});
@@ -20,26 +22,43 @@ class InternshipsListingPage extends StatelessWidget {
 
                 final cardAspect = width < 600 ? 1.7 : 1.6;
 
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: GridView.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: cardAspect,
-                    ),
-                    itemCount: 16, // placeholder count
-                    itemBuilder: (context, index) {
-                      return _InternshipCard(
-                        title: 'Software Intern ${index + 1}',
-                        date: '6-Oct-2025',
-                        description: 'Short description of the internship role, tasks and learning outcomes.',
-                        location: index % 2 == 0 ? 'Remote' : 'United Arab Emirates',
-                        jobId: 'INT-${2000 + index}',
-                      );
-                    },
-                  ),
+                return AnimatedBuilder(
+                  animation: PostStore.I,
+                  builder: (context, _) {
+                    final items = PostStore.I.internships;
+                    return Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: cardAspect,
+                        ),
+                        itemCount: items.isEmpty ? 1 : items.length,
+                        itemBuilder: (context, index) {
+                          if (items.isEmpty) {
+                            // Single placeholder card as a visual template
+                            return const _InternshipCard(
+                              title: 'Software Intern (Template)',
+                              date: '—',
+                              description: 'Use this card style for new internship posts.',
+                              location: '—',
+                              jobId: 'INT-TEMPLATE',
+                            );
+                          }
+                          final it = items[index];
+                          return _InternshipCard(
+                            title: it.title,
+                            date: it.date,
+                            description: it.description,
+                            location: it.location,
+                            jobId: it.id,
+                          );
+                        },
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -75,11 +94,7 @@ class _InternshipCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Open $jobId (demo)')),
-          );
-        },
+        onTap: () => context.push('/internships/$jobId'),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -149,7 +164,7 @@ class _InternshipCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () {},
+                  onPressed: () => context.push('/internships/$jobId'),
                   style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
                   icon: const Icon(Icons.arrow_forward),
                   label: const Text('View Details'),

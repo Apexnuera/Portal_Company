@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'widgets/app_header_clean.dart';
+import 'package:go_router/go_router.dart';
+import 'data/post_store.dart';
 
 class JobsListingPage extends StatelessWidget {
   const JobsListingPage({super.key});
@@ -21,26 +23,43 @@ class JobsListingPage extends StatelessWidget {
 
                 final cardAspect = width < 600 ? 1.7 : 1.6;
 
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: GridView.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: cardAspect,
-                    ),
-                    itemCount: 20, // dynamic placeholder; replace with data length
-                    itemBuilder: (context, index) {
-                      return _JobCard(
-                        title: 'Software Engineer ${index + 1}',
-                        date: '6-Oct-2025',
-                        description: 'Short description of the job role, responsibilities and key requirements.',
-                        location: index % 2 == 0 ? 'United Arab Emirates' : 'Remote',
-                        jobId: 'JOB-${1000 + index}',
-                      );
-                    },
-                  ),
+                return AnimatedBuilder(
+                  animation: PostStore.I,
+                  builder: (context, _) {
+                    final items = PostStore.I.jobs;
+                    return Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: cardAspect,
+                        ),
+                        itemCount: items.isEmpty ? 1 : items.length,
+                        itemBuilder: (context, index) {
+                          if (items.isEmpty) {
+                            // Single placeholder card as a visual template
+                            return const _JobCard(
+                              title: 'Software Engineer (Template)',
+                              date: '—',
+                              description: 'Use this card style for new job posts.',
+                              location: '—',
+                              jobId: 'JOB-TEMPLATE',
+                            );
+                          }
+                          final j = items[index];
+                          return _JobCard(
+                            title: j.title,
+                            date: j.date,
+                            description: j.description,
+                            location: j.location,
+                            jobId: j.id,
+                          );
+                        },
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -76,11 +95,7 @@ class _JobCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Open $jobId (demo)')),
-          );
-        },
+        onTap: () => context.push('/jobs/$jobId'),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -150,7 +165,7 @@ class _JobCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () {},
+                  onPressed: () => context.push('/jobs/$jobId'),
                   style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
                   icon: const Icon(Icons.arrow_forward),
                   label: const Text('View Details'),

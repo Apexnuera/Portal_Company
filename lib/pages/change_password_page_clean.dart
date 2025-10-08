@@ -173,6 +173,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                     child: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
                                 ),
+                                const SizedBox(height: 10),
+                                Center(
+                                  child: TextButton(
+                                    onPressed: () => context.push('/login/otp-method'),
+                                    style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
+                                    child: const Text('Try another method'),
+                                  ),
+                                ),
                               ],
                             ),
                           ),

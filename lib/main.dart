@@ -12,6 +12,11 @@ import 'pages/change_password_page_clean.dart';
 import 'jobs_listing_page.dart';
 import 'internships_listing_page.dart';
 import 'employee_registration_page.dart';
+import 'pages/otp_method_login_page.dart';
+import 'pages/job_details_page.dart';
+import 'pages/job_application_form_page.dart';
+import 'pages/job_application_success_page.dart';
+import 'pages/internship_details_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,11 +35,28 @@ class MyApp extends StatelessWidget {
         GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
         GoRoute(path: '/login/employee', builder: (_, __) => const EmployeeLoginPage()),
         GoRoute(path: '/login/hr', builder: (_, __) => const HRLoginPage()),
+        GoRoute(path: '/login/otp-method', builder: (_, __) => const OTPMethodLoginPage()),
         GoRoute(path: '/change-password', builder: (_, __) => const ChangePasswordPage()),
         GoRoute(path: '/campus-commune', builder: (_, __) => const CampusCommunePage()),
         GoRoute(path: '/help-support', builder: (_, __) => const HelpSupportPage()),
         GoRoute(path: '/jobs', builder: (_, __) => const JobsListingPage()),
+        GoRoute(
+          path: '/jobs/:jobId',
+          builder: (_, state) => JobDetailsPage(jobId: state.pathParameters['jobId']!),
+        ),
+        GoRoute(
+          path: '/jobs/apply/:jobId',
+          builder: (_, state) => JobApplicationFormPage(jobId: state.pathParameters['jobId']!),
+        ),
+        GoRoute(
+          path: '/jobs/apply/:jobId/success',
+          builder: (_, state) => JobApplicationSuccessPage(jobId: state.pathParameters['jobId']!),
+        ),
         GoRoute(path: '/internships', builder: (_, __) => const InternshipsListingPage()),
+        GoRoute(
+          path: '/internships/:internshipId',
+          builder: (_, state) => InternshipDetailsPage(internshipId: state.pathParameters['internshipId']!),
+        ),
         GoRoute(path: '/register/employee', builder: (_, __) => const EmployeeRegistrationPage()),
         // Optional legacy/placeholder routes
         GoRoute(path: '/alerts', builder: (_, __) => const AlertsPage()),

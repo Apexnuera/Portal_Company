@@ -29,10 +29,25 @@ class AppHeader extends StatelessWidget {
   }
 
   Widget _buildDesktopHeader(BuildContext context) {
+    final location = GoRouter.of(context).routeInformationProvider.value.location;
+    final showSearch =
+        location.startsWith('/career/jobs') ||
+        location.startsWith('/career/internships') ||
+        location.startsWith('/jobs') ||
+        location.startsWith('/internships');
+
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildLogo(),
+        if (showSearch) const SizedBox(width: 16),
+        if (showSearch)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: _buildSearchBar(context, location),
+            ),
+          ),
+        if (!showSearch) const Spacer(),
         _buildNavigationMenu(context),
       ],
     );
@@ -90,7 +105,7 @@ class AppHeader extends StatelessWidget {
       'Career',
       'Login',
     ];
-    final routeName = currentRoute ?? ModalRoute.of(context)?.settings.name ?? '/home';
+    final routeName = GoRouter.of(context).routeInformationProvider.value.location;
     const activeColor = Color(0xFFFF782B);
     const baseColor = Colors.black87;
     return Row(
@@ -103,12 +118,7 @@ class AppHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10.0),
           child: TextButton(
             onPressed: () => _handleNavigation(context, label),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              overlayColor: activeColor.withOpacity(0.08),
-            ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(_iconForLabel(label), color: isActive ? activeColor : baseColor, size: 18),
                 const SizedBox(width: 6),
@@ -294,5 +304,52 @@ class AppHeader extends StatelessWidget {
       default:
         return false;
     }
+  }
+
+  Widget _buildSearchBar(BuildContext context, String location) {
+    final isJobs = location.startsWith('/career/jobs') || location.startsWith('/jobs');
+    final isInternships = location.startsWith('/career/internships') || location.startsWith('/internships');
+    final hint = isJobs ? 'Search ' : (isInternships ? 'Search ' : 'Search');
+    final controller = TextEditingController();
+
+    void submit(String q) {
+      final encoded = Uri.encodeQueryComponent(q.trim());
+      if (encoded.isEmpty) return;
+      if (isJobs) {
+        final target = location.startsWith('/career') ? '/career/jobs' : '/jobs';
+        context.go('$target?q=$encoded');
+      } else if (isInternships) {
+        final target = location.startsWith('/career') ? '/career/internships' : '/internships';
+        context.go('$target?q=$encoded');
+      }
+    }
+
+    return SizedBox(
+      height: 40,
+      child: TextField(
+        controller: controller,
+        onSubmitted: submit,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: hint,
+          prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFFFF782B)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24),
+            borderSide: BorderSide(color: const Color(0xFFFF782B).withOpacity(0.4)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24),
+            borderSide: BorderSide(color: const Color(0xFFFF782B).withOpacity(0.3)),
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(24)),
+            borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
+          ),
+          fillColor: Colors.white,
+          filled: true,
+        ),
+      ),
+    );
   }
 }
