@@ -43,17 +43,15 @@ class InternshipsListingPage extends StatelessWidget {
                               title: 'Software Intern (Template)',
                               date: '—',
                               description: 'Use this card style for new internship posts.',
-                              location: '—',
-                              jobId: 'INT-TEMPLATE',
+                              id: 'INT-TEMPLATE',
                             );
                           }
                           final it = items[index];
                           return _InternshipCard(
                             title: it.title,
-                            date: it.date,
+                            date: it.postingDate,
                             description: it.description,
-                            location: it.location,
-                            jobId: it.id,
+                            id: it.id,
                           );
                         },
                       ),
@@ -73,15 +71,13 @@ class _InternshipCard extends StatelessWidget {
   final String title;
   final String date;
   final String description;
-  final String location;
-  final String jobId;
+  final String id;
 
   const _InternshipCard({
     required this.title,
     required this.date,
     required this.description,
-    required this.location,
-    required this.jobId,
+    required this.id,
   });
 
   @override
@@ -94,7 +90,7 @@ class _InternshipCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.push('/internships/$jobId'),
+        onTap: () => context.push('/internships/$id'),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -135,36 +131,12 @@ class _InternshipCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFFFF782B)),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      location,
-                      style: const TextStyle(color: Colors.black87),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF782B).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      jobId,
-                      style: const TextStyle(color: Color(0xFFFF782B), fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
+              // Removed: location and id chip display per requirements
               const SizedBox(height: 10),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () => context.push('/internships/$jobId'),
+                  onPressed: () => context.push('/internships/$id'),
                   style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
                   icon: const Icon(Icons.arrow_forward),
                   label: const Text('View Details'),

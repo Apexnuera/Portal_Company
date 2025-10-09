@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/app_header_clean.dart';
+import '../data/post_store.dart';
 
 class InternshipDetailsPage extends StatelessWidget {
   final String internshipId;
@@ -8,7 +9,7 @@ class InternshipDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = _internshipById(internshipId);
+    final data = PostStore.I.getInternshipById(internshipId);
 
     return Scaffold(
       body: Column(
@@ -17,8 +18,30 @@ class InternshipDetailsPage extends StatelessWidget {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final isSmall = constraints.maxWidth < 800;
-                final maxWidth = isSmall ? 700.0 : 900.0;
+                final isSmall = constraints.maxWidth < 900;
+                final maxWidth = isSmall ? 760.0 : 1000.0;
+                if (data == null) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline, size: 40, color: Colors.redAccent),
+                          const SizedBox(height: 12),
+                          Text('Internship not found: $internshipId', style: const TextStyle(fontSize: 18)),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () => context.go('/internships'),
+                            style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
+                            child: const Text('Back to Internships'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
                 return SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                   child: Center(
@@ -32,46 +55,27 @@ class InternshipDetailsPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // Title row with small id chip
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      data.title,
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFF782B).withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.25)),
-                                    ),
-                                    child: Text(
-                                      data.id,
-                                      style: const TextStyle(color: Color(0xFFFF782B), fontWeight: FontWeight.bold, fontSize: 12),
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                data.title,
+                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
                               ),
 
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: _chip(Icons.calendar_today_outlined, 'Posted: ${data.postingDate}'),
+                              ),
                               const SizedBox(height: 16),
 
-                              // Simple details blocks
                               _labelValue('Skill', data.skill),
                               const SizedBox(height: 10),
                               _labelValue('Qualification', data.qualification),
                               const SizedBox(height: 10),
+                              _labelValue('Duration', data.duration),
+                              const SizedBox(height: 10),
                               _labelValue('Description', data.description),
 
                               const SizedBox(height: 20),
-
                               SizedBox(
                                 height: 46,
                                 child: ElevatedButton(
@@ -110,30 +114,22 @@ class InternshipDetailsPage extends StatelessWidget {
     );
   }
 
-  _Internship _internshipById(String id) {
-    final idx = int.tryParse(id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    return _Internship(
-      id: id,
-      title: 'Software Intern ${idx % 50 + 1}',
-      skill: 'Flutter, Dart, Git',
-      qualification: 'Pursuing CS/IT or related field',
-      description: 'A short internship focused on building Flutter features and learning modern development practices.',
+  Widget _chip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF782B).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFFFF782B)),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w500)),
+        ],
+      ),
     );
   }
-}
-
-class _Internship {
-  final String id;
-  final String title;
-  final String skill;
-  final String qualification;
-  final String description;
-
-  const _Internship({
-    required this.id,
-    required this.title,
-    required this.skill,
-    required this.qualification,
-    required this.description,
-  });
 }

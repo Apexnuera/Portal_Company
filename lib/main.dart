@@ -17,6 +17,10 @@ import 'pages/job_details_page.dart';
 import 'pages/job_application_form_page.dart';
 import 'pages/job_application_success_page.dart';
 import 'pages/internship_details_page.dart';
+import 'pages/hr_dashboard_page.dart';
+import 'pages/hr_post_job_page.dart';
+import 'pages/hr_post_internship_page.dart';
+import 'services/auth_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,6 +33,15 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final router = GoRouter(
       initialLocation: '/home',
+      refreshListenable: AuthService.instance,
+      redirect: (context, state) {
+        // Protect HR routes
+        final goingToHR = state.matchedLocation.startsWith('/hr');
+        if (goingToHR && !AuthService.instance.isHRLoggedIn) {
+          return '/login/hr';
+        }
+        return null;
+      },
       routes: [
         GoRoute(path: '/', redirect: (_, __) => '/home'),
         GoRoute(path: '/home', builder: (_, __) => const HomePage()),
@@ -58,6 +71,10 @@ class MyApp extends StatelessWidget {
           builder: (_, state) => InternshipDetailsPage(internshipId: state.pathParameters['internshipId']!),
         ),
         GoRoute(path: '/register/employee', builder: (_, __) => const EmployeeRegistrationPage()),
+        // HR routes (protected by redirect)
+        GoRoute(path: '/hr/dashboard', builder: (_, __) => const HRDashboardPage()),
+        GoRoute(path: '/hr/post/job', builder: (_, __) => const HRPostJobPage()),
+        GoRoute(path: '/hr/post/internship', builder: (_, __) => const HRPostInternshipPage()),
         // Optional legacy/placeholder routes
         GoRoute(path: '/alerts', builder: (_, __) => const AlertsPage()),
         GoRoute(path: '/buzz', builder: (_, __) => const BuzzPage()),

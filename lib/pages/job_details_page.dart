@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/app_header_clean.dart';
+import '../data/post_store.dart';
 
 class JobDetailsPage extends StatelessWidget {
   final String jobId;
@@ -8,7 +9,7 @@ class JobDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final job = _jobById(jobId);
+    final job = PostStore.I.getJobById(jobId);
 
     return Scaffold(
       body: Column(
@@ -19,6 +20,27 @@ class JobDetailsPage extends StatelessWidget {
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth >= 1000;
                 final horizontal = isWide ? 32.0 : 16.0;
+                if (job == null) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline, size: 40, color: Colors.redAccent),
+                          const SizedBox(height: 12),
+                          Text('Job not found: $jobId', style: const TextStyle(fontSize: 18)),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () => context.go('/jobs'),
+                            style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
+                            child: const Text('Back to Jobs'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
 
                 final content = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,7 +76,9 @@ class JobDetailsPage extends StatelessWidget {
                       children: [
                         _chip(icon: Icons.work_outline, label: job.experience),
                         _chip(icon: Icons.place_outlined, label: job.location),
-                        _chip(icon: Icons.badge_outlined, label: job.type),
+                        _chip(icon: Icons.badge_outlined, label: job.contractType),
+                        _chip(icon: Icons.calendar_today_outlined, label: 'Posted: ${job.postingDate}'),
+                        _chip(icon: Icons.hourglass_bottom_outlined, label: 'Apply by: ${job.applicationDeadline}'),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -177,7 +201,7 @@ class JobDetailsPage extends StatelessWidget {
   }
 
   // Quick facts side panel
-  Widget _factsPanel(_Job job) {
+  Widget _factsPanel(JobPost job) {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -192,7 +216,11 @@ class JobDetailsPage extends StatelessWidget {
             const SizedBox(height: 8),
             _factRow(Icons.public_outlined, 'Location', job.location),
             const SizedBox(height: 8),
-            _factRow(Icons.payments_outlined, 'Compensation', job.compensation),
+            _factRow(Icons.badge_outlined, 'Contract Type', job.contractType),
+            const SizedBox(height: 8),
+            _factRow(Icons.calendar_today_outlined, 'Posting Date', job.postingDate),
+            const SizedBox(height: 8),
+            _factRow(Icons.hourglass_bottom_outlined, 'Application Deadline', job.applicationDeadline),
             const Divider(height: 24),
             _sectionTitle('Job ID'),
             Text(job.id, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -208,7 +236,7 @@ class JobDetailsPage extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: const Color(0xFFFF782B)),
         const SizedBox(width: 8),
-        Expanded(
+        Flexible(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -290,60 +318,4 @@ class JobDetailsPage extends StatelessWidget {
     );
   }
 
-  // Placeholder data fetcher by jobId
-  _Job _jobById(String id) {
-    final idx = int.tryParse(id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    final title = 'Software Engineer ${idx % 50 + 1}';
-    return _Job(
-      id: id,
-      title: title,
-      experience: '${1 + (idx % 7)} - ${3 + (idx % 9)} years',
-      skills: const ['Dart & Flutter', 'REST APIs', 'State Management', 'Unit Testing', 'CI/CD'],
-      responsibilities: const [
-        'Design and build advanced applications using Flutter.',
-        'Collaborate with cross-functional teams to define and ship features.',
-        'Write clean, maintainable and testable code.',
-        'Participate in code reviews and mentor junior developers.',
-      ],
-      qualifications: const [
-        'Bachelor’s degree in Computer Science or related field.',
-        'Strong problem-solving and debugging skills.',
-        'Good understanding of software development lifecycle.',
-      ],
-      description:
-          'We are looking for a passionate Flutter developer to join our growing mobile team. You will work closely with designers and product managers to deliver high-quality, scalable applications that delight users. You should be comfortable with modern Flutter patterns, testing, and continuous delivery.',
-      department: 'Engineering',
-      location: idx % 2 == 0 ? 'United Arab Emirates' : 'Remote',
-      type: idx % 3 == 0 ? 'Full-time' : 'Contract',
-      compensation: idx % 3 == 0 ? 'Competitive + benefits' : 'Market rate',
-    );
-  }
-}
-
-class _Job {
-  final String id;
-  final String title;
-  final String experience;
-  final List<String> skills;
-  final List<String> responsibilities;
-  final List<String> qualifications;
-  final String description;
-  final String department;
-  final String location;
-  final String type;
-  final String compensation;
-
-  const _Job({
-    required this.id,
-    required this.title,
-    required this.experience,
-    required this.skills,
-    required this.responsibilities,
-    required this.qualifications,
-    required this.description,
-    required this.department,
-    required this.location,
-    required this.type,
-    required this.compensation,
-  });
 }

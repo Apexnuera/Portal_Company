@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/app_header_clean.dart';
+import '../data/application_store.dart';
 import '../utils/resume_picker_stub.dart'
     if (dart.library.html) '../utils/resume_picker_web.dart';
 
@@ -45,6 +46,30 @@ class _JobApplicationFormPageState extends State<JobApplicationFormPage> {
     await Future.delayed(const Duration(milliseconds: 500));
     setState(() => _submitting = false);
 
+    // Record application for HR dashboard
+    final email = _emailController.text.trim();
+    final resume = _fileName!;
+    final now = DateTime.now();
+    if (widget.jobId.startsWith('INT-')) {
+      ApplicationStore.I.addInternshipApplication(
+        InternshipApplication(
+          internshipId: widget.jobId,
+          email: email,
+          resumeName: resume,
+          createdAt: now,
+        ),
+      );
+    } else {
+      ApplicationStore.I.addJobApplication(
+        JobApplication(
+          jobId: widget.jobId,
+          email: email,
+          resumeName: resume,
+          createdAt: now,
+        ),
+      );
+    }
+
     context.go('/jobs/apply/${widget.jobId}/success');
   }
 
@@ -77,20 +102,20 @@ class _JobApplicationFormPageState extends State<JobApplicationFormPage> {
                               children: [
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.assignment_outlined, color: Color(0xFFFF782B)),
-                                    const SizedBox(width: 8),
+                                  children: const [
+                                    Icon(Icons.assignment_outlined, color: Color(0xFFFF782B)),
+                                    SizedBox(width: 8),
                                     Text(
-                                      'Apply for ${widget.jobId}',
+                                      'Apply',
                                       style: TextStyle(
-                                        fontSize: isSmall ? 20 : 22,
+                                        fontSize: 22,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.black87,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
+                                SizedBox(height: isSmall ? 12 : 16),
 
                                 TextFormField(
                                   controller: _emailController,
@@ -99,14 +124,11 @@ class _JobApplicationFormPageState extends State<JobApplicationFormPage> {
                                     labelText: 'Email ID',
                                     prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFFFF782B)),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
+                                    focusedBorder: const OutlineInputBorder(
+                                      borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) => (v == null || v.trim().isEmpty)
-                                      ? 'Please enter your email'
-                                      : null,
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your email' : null,
                                 ),
                                 const SizedBox(height: 12),
 
@@ -121,10 +143,7 @@ class _JobApplicationFormPageState extends State<JobApplicationFormPage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
-                                        'Resume Upload',
-                                        style: TextStyle(fontWeight: FontWeight.bold),
-                                      ),
+                                      const Text('Resume Upload', style: TextStyle(fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 8),
                                       Row(
                                         children: [
@@ -152,19 +171,16 @@ class _JobApplicationFormPageState extends State<JobApplicationFormPage> {
                                 ),
 
                                 const SizedBox(height: 16),
-                                SizedBox(
-                                  height: 46,
-                                  child: ElevatedButton(
-                                    onPressed: _submitting ? null : _submit,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFFF782B),
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    ),
-                                    child: Text(
-                                      _submitting ? 'Submitting...' : 'Submit Application',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                    ),
+                                ElevatedButton(
+                                  onPressed: _submitting ? null : _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFFF782B),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: Text(
+                                    _submitting ? 'Submitting...' : 'Apply',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],

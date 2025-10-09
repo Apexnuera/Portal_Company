@@ -51,7 +51,7 @@ class JobsListingPage extends StatelessWidget {
                           final j = items[index];
                           return _JobCard(
                             title: j.title,
-                            date: j.date,
+                            date: j.postingDate,
                             description: j.description,
                             location: j.location,
                             jobId: j.id,

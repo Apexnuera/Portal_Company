@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/auth_service.dart';
 import '../widgets/app_header_clean.dart';
 
 class HRLoginPage extends StatefulWidget {
@@ -106,9 +107,9 @@ class _HRLoginPageState extends State<HRLoginPage> {
                                   child: ElevatedButton(
                                     onPressed: () {
                                       if (_formKey.currentState!.validate()) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Logging in...')),
-                                        );
+                                        // Placeholder auth success
+                                        AuthService.instance.setHRLoggedIn(true);
+                                        context.go('/hr/dashboard');
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
