@@ -3,7 +3,8 @@ import 'widgets/app_header_clean.dart';
 import 'data/support_store.dart';
 
 class HelpSupportPage extends StatefulWidget {
-  const HelpSupportPage({super.key});
+  final String? initialDescription;
+  const HelpSupportPage({super.key, this.initialDescription});
 
   @override
   State<HelpSupportPage> createState() => _HelpSupportPageState();
@@ -14,6 +15,16 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   final _emailController = TextEditingController();
   final _descriptionController = TextEditingController();
   bool _submitted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill description if provided via navigation
+    final init = widget.initialDescription;
+    if (init != null && init.isNotEmpty) {
+      _descriptionController.text = init;
+    }
+  }
 
   @override
   void dispose() {

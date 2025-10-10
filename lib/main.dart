@@ -51,7 +51,12 @@ class MyApp extends StatelessWidget {
         GoRoute(path: '/login/otp-method', builder: (_, __) => const OTPMethodLoginPage()),
         GoRoute(path: '/change-password', builder: (_, __) => const ChangePasswordPage()),
         GoRoute(path: '/campus-commune', builder: (_, __) => const CampusCommunePage()),
-        GoRoute(path: '/help-support', builder: (_, __) => const HelpSupportPage()),
+        GoRoute(
+          path: '/help-support',
+          builder: (_, state) => HelpSupportPage(
+            initialDescription: state.uri.queryParameters['desc'],
+          ),
+        ),
         GoRoute(path: '/jobs', builder: (_, __) => const JobsListingPage()),
         GoRoute(
           path: '/jobs/:jobId',

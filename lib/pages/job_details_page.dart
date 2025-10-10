@@ -60,7 +60,12 @@ class JobDetailsPage extends StatelessWidget {
                           ),
                         ),
                         TextButton.icon(
-                          onPressed: () => debugPrint('Report job ${job.id}') ,
+                          onPressed: () {
+                            final uri = Uri(path: '/help-support', queryParameters: {
+                              'desc': 'Reporting Job ID: ${job.id}',
+                            });
+                            context.push(uri.toString());
+                          },
                           icon: const Icon(Icons.flag_outlined, size: 18),
                           label: const Text('Report'),
                           style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF782B)),
