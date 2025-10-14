@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/app_header_clean.dart';
+import 'services/auth_service.dart';
 
 class EmployeeLoginPage extends StatefulWidget {
   const EmployeeLoginPage({super.key});
@@ -117,9 +118,14 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                             child: ElevatedButton(
                               onPressed: () {
                                 if (_formKey.currentState!.validate()) {
+                                  // Simulate login process
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text('Logging in...')),
                                   );
+                                  
+                                  // Set employee as logged in and navigate to home
+                                  AuthService.instance.setEmployeeLoggedIn(true);
+                                  context.go('/home');
                                 }
                               },
                               style: ElevatedButton.styleFrom(

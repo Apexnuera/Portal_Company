@@ -1130,6 +1130,7 @@ class _RightPanel extends StatelessWidget {
     );
   }
 }
+
 class _InfoCard extends StatelessWidget {
   final IconData icon;
   final String title;

@@ -40,6 +40,7 @@ class MyApp extends StatelessWidget {
         if (goingToHR && !AuthService.instance.isHRLoggedIn) {
           return '/login/hr';
         }
+        
         return null;
       },
       routes: [
