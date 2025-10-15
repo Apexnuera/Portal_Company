@@ -1,10 +1,918 @@
+import 'dart:html' as html;
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../data/post_store.dart';
 import '../data/support_store.dart';
 import '../data/application_store.dart';
 
-enum _HRMenu { overview, queries, postJob, postInternship }
+enum _HRMenu { overview, queries, postJob, postInternship, employeeDetails }
+
+class _EmployeeDetailsData extends ChangeNotifier {
+  final List<_EmployeeRecord> _employees = [];
+
+  List<_EmployeeRecord> get employees => List.unmodifiable(_employees);
+
+  void addEmployee(_EmployeeRecord record) {
+    _employees.insert(0, record);
+    notifyListeners();
+  }
+
+  void removeEmployee(_EmployeeRecord record) {
+    _employees.remove(record);
+    notifyListeners();
+  }
+
+  void updateEmployee(_EmployeeRecord original, _EmployeeRecord updated) {
+    final index = _employees.indexOf(original);
+    if (index != -1) {
+      _employees[index] = updated;
+      notifyListeners();
+    }
+  }
+}
+
+class _EmployeeRecord {
+  final String id;
+  final String name;
+  final String email;
+  final String password;
+  final _EmployeeProfileData profile;
+
+  const _EmployeeRecord({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.password,
+    required this.profile,
+  });
+
+  _EmployeeRecord copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? password,
+    _EmployeeProfileData? profile,
+  }) {
+    return _EmployeeRecord(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      password: password ?? this.password,
+      profile: profile ?? this.profile.clone(),
+    );
+  }
+}
+
+class _EmployeeProfileData {
+  String personalEmail;
+  String alternatePhone;
+  String address;
+  DateTime? dateOfBirth;
+  String bloodGroup;
+  Uint8List? profileImageBytes;
+
+  String designation;
+  String department;
+  String managerName;
+  String employmentType;
+  String workLocation;
+  DateTime? startDate;
+  DateTime? confirmationDate;
+  List<String> skills;
+
+  String baseSalary;
+  String bonus;
+  String allowances;
+
+  String panId;
+  String taxId;
+
+  List<_TimeSheetEntry> timeSheet;
+  List<_FaqItem> faqs;
+
+  _EmployeeProfileData({
+    required this.personalEmail,
+    required this.alternatePhone,
+    required this.address,
+    required this.dateOfBirth,
+    required this.bloodGroup,
+    required this.profileImageBytes,
+    required this.designation,
+    required this.department,
+    required this.managerName,
+    required this.employmentType,
+    required this.workLocation,
+    required this.startDate,
+    required this.confirmationDate,
+    required this.skills,
+    required this.baseSalary,
+    required this.bonus,
+    required this.allowances,
+    required this.panId,
+    required this.taxId,
+    required this.timeSheet,
+    required this.faqs,
+  });
+
+  factory _EmployeeProfileData.empty() {
+    return _EmployeeProfileData(
+      personalEmail: '',
+      alternatePhone: '',
+      address: '',
+      dateOfBirth: null,
+      bloodGroup: '',
+      profileImageBytes: null,
+      designation: '',
+      department: '',
+      managerName: '',
+      employmentType: '',
+      workLocation: '',
+      startDate: null,
+      confirmationDate: null,
+      skills: [],
+      baseSalary: '',
+      bonus: '',
+      allowances: '',
+      panId: '',
+      taxId: '',
+      timeSheet: [],
+      faqs: [],
+    );
+  }
+
+  _EmployeeProfileData clone() {
+    return _EmployeeProfileData(
+      personalEmail: personalEmail,
+      alternatePhone: alternatePhone,
+      address: address,
+      dateOfBirth: dateOfBirth != null ? DateTime.fromMillisecondsSinceEpoch(dateOfBirth!.millisecondsSinceEpoch) : null,
+      bloodGroup: bloodGroup,
+      profileImageBytes: profileImageBytes != null ? Uint8List.fromList(profileImageBytes!) : null,
+      designation: designation,
+      department: department,
+      managerName: managerName,
+      employmentType: employmentType,
+      workLocation: workLocation,
+      startDate: startDate != null ? DateTime.fromMillisecondsSinceEpoch(startDate!.millisecondsSinceEpoch) : null,
+      confirmationDate: confirmationDate != null ? DateTime.fromMillisecondsSinceEpoch(confirmationDate!.millisecondsSinceEpoch) : null,
+      skills: List<String>.from(skills),
+      baseSalary: baseSalary,
+      bonus: bonus,
+      allowances: allowances,
+      panId: panId,
+      taxId: taxId,
+      timeSheet: timeSheet.map((e) => e.clone()).toList(),
+      faqs: faqs.map((e) => e.clone()).toList(),
+    );
+  }
+}
+
+class _TimeSheetEntry {
+  String title;
+  DateTime date;
+  double hours;
+  String status;
+
+  _TimeSheetEntry({
+    required this.title,
+    required this.date,
+    required this.hours,
+    required this.status,
+  });
+
+  _TimeSheetEntry clone() {
+    return _TimeSheetEntry(
+      title: title,
+      date: DateTime.fromMillisecondsSinceEpoch(date.millisecondsSinceEpoch),
+      hours: hours,
+      status: status,
+    );
+  }
+}
+
+class _FaqItem {
+  String question;
+  String answer;
+
+  _FaqItem({required this.question, required this.answer});
+
+  _FaqItem clone() {
+    return _FaqItem(question: question, answer: answer);
+  }
+}
+
+class _EmployeeDetailsModule extends StatefulWidget {
+  const _EmployeeDetailsModule();
+
+  @override
+  State<_EmployeeDetailsModule> createState() => _EmployeeDetailsModuleState();
+}
+
+class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  final _EmployeeDetailsData _data = _EmployeeDetailsData();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _data,
+      builder: (context, _) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      labelColor: const Color(0xFFFF782B),
+                      unselectedLabelColor: Colors.black54,
+                      indicator: BoxDecoration(
+                        color: const Color(0xFFFF782B).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.5)),
+                      ),
+                      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+                      tabs: const [
+                        Tab(text: 'Create New Employee'),
+                        Tab(text: 'Employee List'),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    height: 540,
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _CreateEmployeeForm(
+                          onCreate: (record) {
+                            _data.addEmployee(record);
+                            _tabController.animateTo(1);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Employee "${record.name}" created successfully.')),
+                            );
+                          },
+                        ),
+                        _EmployeeListView(
+                          employees: _data.employees,
+                          onView: (record) {
+                            showDialog<void>(
+                              context: context,
+                              builder: (context) => _ViewEmployeeDialog(employee: record),
+                            );
+                          },
+                          onEdit: (record) async {
+                            final updatedRecord = await showDialog<_EmployeeRecord>(
+                              context: context,
+                              builder: (context) => _EditEmployeeDialog(employee: record),
+                            );
+
+                            if (updatedRecord != null) {
+                              _data.updateEmployee(record, updatedRecord);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Employee "${updatedRecord.name}" updated.')),
+                              );
+                            }
+                          },
+                          onDelete: (record) async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Delete Employee'),
+                                content: Text('Are you sure you want to delete ${record.name}?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.of(context).pop(true),
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirmed == true) {
+                              _data.removeEmployee(record);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Employee "${record.name}" deleted.')),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CreateEmployeeForm extends StatefulWidget {
+  final ValueChanged<_EmployeeRecord> onCreate;
+  const _CreateEmployeeForm({required this.onCreate});
+
+  @override
+  State<_CreateEmployeeForm> createState() => _CreateEmployeeFormState();
+}
+
+class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _employeeIdController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _employeeIdController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _createEmployee() {
+    if (_formKey.currentState?.validate() ?? false) {
+      final record = _EmployeeRecord(
+        id: _employeeIdController.text.trim(),
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        profile: _EmployeeProfileData.empty(),
+      );
+      widget.onCreate(record);
+      _nameController.clear();
+      _emailController.clear();
+      _passwordController.clear();
+      _employeeIdController.clear();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Create New Employee',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Fill in the details below to set up a new employee account. The password entered will be used for the initial login.',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _employeeIdController,
+              decoration: InputDecoration(
+                labelText: 'Employee ID',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                prefixIcon: const Icon(Icons.badge_outlined),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter an employee ID';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: 'Employee Name',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                prefixIcon: const Icon(Icons.person_outline),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter the employee name';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                labelText: 'Employee Email',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                prefixIcon: const Icon(Icons.email_outlined),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter the employee email';
+                }
+                final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                if (!emailRegex.hasMatch(value.trim())) {
+                  return 'Please enter a valid email address';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _passwordController,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+              ),
+              obscureText: _obscurePassword,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please provide a password';
+                }
+                if (value.trim().length < 6) {
+                  return 'Password should be at least 6 characters long';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _createEmployee,
+                icon: const Icon(Icons.person_add_alt_1_outlined),
+                label: const Text('Create Employee', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF782B),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmployeeListView extends StatelessWidget {
+  final List<_EmployeeRecord> employees;
+  final ValueChanged<_EmployeeRecord> onView;
+  final ValueChanged<_EmployeeRecord> onEdit;
+  final ValueChanged<_EmployeeRecord> onDelete;
+  const _EmployeeListView({
+    required this.employees,
+    required this.onView,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (employees.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people_outline, size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text(
+              'No employees have been added yet.',
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Employee List',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: constraints.maxWidth,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    child: DataTable(
+                      headingRowColor: MaterialStateProperty.all(Colors.grey.shade100),
+                      columnSpacing: 28,
+                      horizontalMargin: 24,
+                      dataRowHeight: 60,
+                      headingTextStyle: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black87),
+                      columns: const [
+                        DataColumn(label: Text('Employee ID')),
+                        DataColumn(label: Text('Employee Name')),
+                        DataColumn(label: Text('Employee Email')),
+                        DataColumn(label: Text('Actions')),
+                      ],
+                      rows: employees.map((employee) {
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(employee.id)),
+                            DataCell(Text(employee.name)),
+                            DataCell(Text(employee.email)),
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    onPressed: () => onView(employee),
+                                    icon: const Icon(Icons.visibility_outlined),
+                                    tooltip: 'View Details',
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    onPressed: () => onEdit(employee),
+                                    icon: const Icon(Icons.edit_outlined),
+                                    tooltip: 'Edit Employee',
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    onPressed: () => onDelete(employee),
+                                    icon: const Icon(Icons.delete_outline),
+                                    color: Colors.red,
+                                    tooltip: 'Delete Employee',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ViewEmployeeDialog extends StatelessWidget {
+  final _EmployeeRecord employee;
+  const _ViewEmployeeDialog({required this.employee});
+
+  Widget _buildDetailTile({required IconData icon, required String label, required String value}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF782B).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: const Color(0xFFFF782B), size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.visibility_outlined, color: Color(0xFFFF782B)),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Employee Details',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 1,
+                  childAspectRatio: 3.8,
+                  mainAxisSpacing: 16,
+                  children: [
+                    _buildDetailTile(
+                      icon: Icons.badge_outlined,
+                      label: 'Employee ID',
+                      value: employee.id,
+                    ),
+                    _buildDetailTile(
+                      icon: Icons.person_outline,
+                      label: 'Employee Name',
+                      value: employee.name,
+                    ),
+                    _buildDetailTile(
+                      icon: Icons.email_outlined,
+                      label: 'Employee Email',
+                      value: employee.email,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EditEmployeeDialog extends StatefulWidget {
+  final _EmployeeRecord employee;
+  const _EditEmployeeDialog({required this.employee});
+
+  @override
+  State<_EditEmployeeDialog> createState() => _EditEmployeeDialogState();
+}
+
+class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _employeeIdController;
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
+  bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _employeeIdController = TextEditingController(text: widget.employee.id);
+    _nameController = TextEditingController(text: widget.employee.name);
+    _emailController = TextEditingController(text: widget.employee.email);
+    _passwordController = TextEditingController(text: widget.employee.password);
+  }
+
+  @override
+  void dispose() {
+    _employeeIdController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_formKey.currentState?.validate() ?? false) {
+      final updated = widget.employee.copyWith(
+        id: _employeeIdController.text.trim(),
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      Navigator.of(context).pop(updated);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.edit_outlined, color: Color(0xFFFF782B)),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Edit Employee',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _employeeIdController,
+                    decoration: InputDecoration(
+                      labelText: 'Employee ID',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.badge_outlined),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter an employee ID';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Employee Name',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.person_outline),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter the employee name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: InputDecoration(
+                      labelText: 'Employee Email',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.email_outlined),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter the employee email';
+                      }
+                      final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                      if (!emailRegex.hasMatch(value.trim())) {
+                        return 'Please enter a valid email address';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _passwordController,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                    ),
+                    obscureText: _obscurePassword,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please provide a password';
+                      }
+                      if (value.trim().length < 6) {
+                        return 'Password should be at least 6 characters long';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: _save,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF782B),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _JobsModule extends StatefulWidget {
   const _JobsModule();
@@ -1053,6 +1961,12 @@ class _Sidebar extends StatelessWidget {
             selected: selected == _HRMenu.postInternship,
             onTap: () => onSelect(_HRMenu.postInternship),
           ),
+          ListTile(
+            leading: const Icon(Icons.people_outline, color: Color(0xFFFF782B)),
+            title: const Text('Employee Details'),
+            selected: selected == _HRMenu.employeeDetails,
+            onTap: () => onSelect(_HRMenu.employeeDetails),
+          ),
         ],
       ),
     );
@@ -1092,6 +2006,11 @@ class _TopNav extends StatelessWidget {
             icon: const Icon(Icons.school_outlined, color: Color(0xFFFF782B)),
             label: const Text('Internships'),
           ),
+          TextButton.icon(
+            onPressed: () => onSelect(_HRMenu.employeeDetails),
+            icon: const Icon(Icons.people_outline, color: Color(0xFFFF782B)),
+            label: const Text('Employee Details'),
+          ),
         ],
       ),
     );
@@ -1116,6 +2035,9 @@ class _RightPanel extends StatelessWidget {
         break;
       case _HRMenu.postInternship:
         child = const _InternshipsModule();
+        break;
+      case _HRMenu.employeeDetails:
+        child = const _EmployeeDetailsModule();
         break;
     }
 

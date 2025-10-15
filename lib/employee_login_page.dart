@@ -123,9 +123,9 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                                     const SnackBar(content: Text('Logging in...')),
                                   );
                                   
-                                  // Set employee as logged in and navigate to home
+                                  // Set employee as logged in and navigate to employee dashboard
                                   AuthService.instance.setEmployeeLoggedIn(true);
-                                  context.go('/home');
+                                  context.go('/employee/dashboard');
                                 }
                               },
                               style: ElevatedButton.styleFrom(
