@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'pages/homepage_clean.dart';
 import 'alerts_page.dart';
 import 'campus_commune_page.dart';
@@ -22,6 +23,7 @@ import 'pages/hr_post_job_page.dart';
 import 'pages/hr_post_internship_page.dart';
 import 'pages/employee_dashboard_page.dart';
 import 'services/auth_service.dart';
+import 'state/employee_directory.dart';
 
 void main() {
   runApp(const MyApp());
@@ -96,14 +98,21 @@ class MyApp extends StatelessWidget {
       ],
     );
 
-    return MaterialApp.router(
-      title: 'Company Portal',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFF782B)),
-        useMaterial3: true,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<EmployeeDirectory>(
+          create: (_) => EmployeeDirectory(),
+        ),
+      ],
+      child: MaterialApp.router(
+        title: 'Company Portal',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFF782B)),
+          useMaterial3: true,
+        ),
+        routerConfig: router,
       ),
-      routerConfig: router,
     );
   }
 }

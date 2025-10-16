@@ -3,9 +3,12 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../data/post_store.dart';
 import '../data/support_store.dart';
 import '../data/application_store.dart';
+import '../state/employee_directory.dart';
+import 'hr_employee_portal_page.dart';
 
 enum _HRMenu { overview, queries, postJob, postInternship, employeeDetails }
 
@@ -281,9 +284,13 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> with Sin
                         _EmployeeListView(
                           employees: _data.employees,
                           onView: (record) {
-                            showDialog<void>(
-                              context: context,
-                              builder: (context) => _ViewEmployeeDialog(employee: record),
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => ChangeNotifierProvider<EmployeeDirectory>.value(
+                                  value: context.read<EmployeeDirectory>()..setPrimaryEmployee(record.id),
+                                  child: HREmployeePortalPage(employeeId: record.id),
+                                ),
+                              ),
                             );
                           },
                           onEdit: (record) async {
@@ -1887,38 +1894,41 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('HR Dashboard'),
-        backgroundColor: const Color(0xFFFF782B),
-        foregroundColor: Colors.white,
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 900;
-          if (isWide) {
-            return Row(
+    return ChangeNotifierProvider<EmployeeDirectory>.value(
+      value: EmployeeDirectory(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('HR Dashboard'),
+          backgroundColor: const Color(0xFFFF782B),
+          foregroundColor: Colors.white,
+        ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 900;
+            if (isWide) {
+              return Row(
+                children: [
+                  _Sidebar(
+                    selected: _selected,
+                    onSelect: (m) => setState(() => _selected = m),
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: _RightPanel(selected: _selected)),
+                ],
+              );
+            }
+            return Column(
               children: [
-                _Sidebar(
+                _TopNav(
                   selected: _selected,
                   onSelect: (m) => setState(() => _selected = m),
                 ),
-                const VerticalDivider(width: 1),
+                const Divider(height: 1),
                 Expanded(child: _RightPanel(selected: _selected)),
               ],
             );
-          }
-          return Column(
-            children: [
-              _TopNav(
-                selected: _selected,
-                onSelect: (m) => setState(() => _selected = m),
-              ),
-              const Divider(height: 1),
-              Expanded(child: _RightPanel(selected: _selected)),
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
