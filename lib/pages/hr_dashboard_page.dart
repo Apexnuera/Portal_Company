@@ -1,8 +1,6 @@
-import 'dart:html' as html;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../data/post_store.dart';
 import '../data/support_store.dart';
@@ -256,9 +254,9 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> with Sin
                       labelColor: const Color(0xFFFF782B),
                       unselectedLabelColor: Colors.black54,
                       indicator: BoxDecoration(
-                        color: const Color(0xFFFF782B).withOpacity(0.12),
+                        color: const Color(0xFFFF782B).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.5)),
+                        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.5)),
                       ),
                       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
                       tabs: const [
@@ -275,6 +273,43 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> with Sin
                         _CreateEmployeeForm(
                           onCreate: (record) {
                             _data.addEmployee(record);
+                            // Add to global EmployeeDirectory
+                            final globalRecord = EmployeeRecord(
+                              id: record.id,
+                              name: record.name,
+                              primaryEmail: record.email,
+                              personal: EmployeePersonalDetails(
+                                fullName: record.name,
+                                familyName: '',
+                                corporateEmail: record.email,
+                                personalEmail: '',
+                                mobileNumber: '',
+                                alternateMobileNumber: '',
+                                currentAddress: '',
+                                permanentAddress: '',
+                                panId: '',
+                                aadharId: '',
+                                dateOfBirth: null,
+                                bloodGroup: '',
+                                otherAssets: '',
+                                profileImageBytes: null,
+                                assignedAssets: <String>{},
+                              ),
+                              professional: EmployeeProfessionalProfile(
+                                position: '',
+                                employeeId: record.id,
+                                department: '',
+                                managerName: '',
+                                employmentType: '',
+                                location: '',
+                                workSpace: '',
+                                jobLevel: '',
+                                startDate: null,
+                                confirmationDate: null,
+                                skills: '',
+                              ),
+                            );
+                            context.read<EmployeeDirectory>().addEmployee(globalRecord);
                             _tabController.animateTo(1);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Employee "${record.name}" created successfully.')),
@@ -556,7 +591,7 @@ class _EmployeeListView extends StatelessWidget {
                   border: Border.all(color: Colors.grey.shade300),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
+                      color: Colors.black.withValues(alpha: 0.03),
                       blurRadius: 6,
                       offset: const Offset(0, 3),
                     ),
@@ -567,10 +602,11 @@ class _EmployeeListView extends StatelessWidget {
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(
-                      headingRowColor: MaterialStateProperty.all(Colors.grey.shade100),
+                      headingRowColor: WidgetStateProperty.all(Colors.grey.shade100),
                       columnSpacing: 28,
                       horizontalMargin: 24,
-                      dataRowHeight: 60,
+                      dataRowMinHeight: 60,
+                      dataRowMaxHeight: 60,
                       headingTextStyle: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black87),
                       columns: const [
                         DataColumn(label: Text('Employee ID')),
@@ -642,7 +678,7 @@ class _ViewEmployeeDialog extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFF782B).withOpacity(0.1),
+              color: const Color(0xFFFF782B).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: const Color(0xFFFF782B), size: 22),
@@ -1006,53 +1042,54 @@ class _JobsModuleState extends State<_JobsModule> {
                       border: Border.all(color: Colors.grey.shade300),
                     ),
                     child: TabBar(
-                    labelColor: const Color(0xFFFF782B),
-                    unselectedLabelColor: Colors.black54,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicator: BoxDecoration(
-                      color: const Color(0xFFFF782B).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.5)),
-                    ),
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                    tabs: const [
-                      Tab(text: 'Applications'),
-                      Tab(text: 'Post New Job'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Builder(builder: (context) {
-                  double h = MediaQuery.of(context).size.height - 330;
-                  if (h < 320) h = 320;
-                  if (h > 900) h = 900;
-                  return SizedBox(
-                    height: h,
-                    child: TabBarView(
-                      children: [
-                        _JobApplicationsList(
-                          currentPage: _currentPage,
-                          itemsPerPage: _itemsPerPage,
-                          onDownload: _downloadResume,
-                          onDelete: _deleteApplication,
-                        ),
-                        const _PostJobFormInline(),
+                      labelColor: const Color(0xFFFF782B),
+                      unselectedLabelColor: Colors.black54,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        color: const Color(0xFFFF782B).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.5)),
+                      ),
+                      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+                      tabs: const [
+                        Tab(text: 'Applications'),
+                        Tab(text: 'Post New Job'),
                       ],
                     ),
-                  );
-                }),
-              ],
+                  ),
+                  const SizedBox(height: 12),
+                  Builder(builder: (context) {
+                    double h = MediaQuery.of(context).size.height - 330;
+                    if (h < 320) h = 320;
+                    if (h > 900) h = 900;
+                    return SizedBox(
+                      height: h,
+                      child: TabBarView(
+                        children: [
+                          _JobApplicationsList(
+                            currentPage: _currentPage,
+                            itemsPerPage: _itemsPerPage,
+                            onDownload: _downloadResume,
+                            onDelete: _deleteApplication,
+                          ),
+                          const _PostJobFormInline(),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
-        ),
-        if (totalPages > 1)
-          _PaginationControls(
-            currentPage: _currentPage,
-            totalPages: totalPages,
-            onPageChanged: (page) {
-              setState(() => _currentPage = page);
-            },
-          ),
+          totalPages > 1
+              ? _PaginationControls(
+                  currentPage: _currentPage,
+                  totalPages: totalPages,
+                  onPageChanged: (page) {
+                    setState(() => _currentPage = page);
+                  },
+                )
+              : const SizedBox.shrink(),
         ],
       ),
     );
@@ -1159,38 +1196,39 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
                       ],
                     ),
                   ),
-                const SizedBox(height: 12),
-                Builder(builder: (context) {
-                  double h = MediaQuery.of(context).size.height - 330;
-                  if (h < 320) h = 320;
-                  if (h > 900) h = 900;
-                  return SizedBox(
-                    height: h,
-                    child: TabBarView(
-                      children: [
-                        _InternshipApplicationsList(
-                          currentPage: _currentPage,
-                          itemsPerPage: _itemsPerPage,
-                          onDownload: _downloadResume,
-                          onDelete: _deleteApplication,
-                        ),
-                        const _PostInternshipFormInline(),
-                      ],
-                    ),
-                  );
-                }),
-              ],
+                  const SizedBox(height: 12),
+                  Builder(builder: (context) {
+                    double h = MediaQuery.of(context).size.height - 330;
+                    if (h < 320) h = 320;
+                    if (h > 900) h = 900;
+                    return SizedBox(
+                      height: h,
+                      child: TabBarView(
+                        children: [
+                          _InternshipApplicationsList(
+                            currentPage: _currentPage,
+                            itemsPerPage: _itemsPerPage,
+                            onDownload: _downloadResume,
+                            onDelete: _deleteApplication,
+                          ),
+                          const _PostInternshipFormInline(),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
-        ),
-        if (totalPages > 1)
-          _PaginationControls(
-            currentPage: _currentPage,
-            totalPages: totalPages,
-            onPageChanged: (page) {
-              setState(() => _currentPage = page);
-            },
-          ),
+          totalPages > 1
+              ? _PaginationControls(
+                  currentPage: _currentPage,
+                  totalPages: totalPages,
+                  onPageChanged: (page) {
+                    setState(() => _currentPage = page);
+                  },
+                )
+              : const SizedBox.shrink(),
         ],
       ),
     );
@@ -1206,9 +1244,9 @@ class _ApplicationListHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF782B).withOpacity(0.08),
+        color: const Color(0xFFFF782B).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.2), width: 1),
+        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.2), width: 1),
       ),
       child: Row(
         children: [
@@ -1502,7 +1540,7 @@ class _ApplicationCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF782B).withOpacity(0.1),
+                color: const Color(0xFFFF782B).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(
@@ -1598,7 +1636,7 @@ class _ApplicationCard extends StatelessWidget {
               iconSize: 20,
               tooltip: 'Delete Application',
               style: IconButton.styleFrom(
-                backgroundColor: Colors.red.withOpacity(0.1),
+                backgroundColor: Colors.red.withValues(alpha: 0.1),
                 padding: const EdgeInsets.all(8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1690,9 +1728,9 @@ class _StatusChipDropdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.12),
+        color: statusColor.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: statusColor.withOpacity(0.4), width: 1.5),
+        border: Border.all(color: statusColor.withValues(alpha: 0.4), width: 1.5),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -1777,7 +1815,7 @@ class _PaginationControls extends StatelessWidget {
             icon: const Icon(Icons.chevron_left),
             tooltip: 'Previous Page',
             style: IconButton.styleFrom(
-              backgroundColor: currentPage > 0 ? const Color(0xFFFF782B).withOpacity(0.1) : Colors.grey.shade200,
+              backgroundColor: currentPage > 0 ? const Color(0xFFFF782B).withValues(alpha: 0.1) : Colors.grey.shade200,
               foregroundColor: currentPage > 0 ? const Color(0xFFFF782B) : Colors.grey,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -1814,7 +1852,7 @@ class _PaginationControls extends StatelessWidget {
             icon: const Icon(Icons.chevron_right),
             tooltip: 'Next Page',
             style: IconButton.styleFrom(
-              backgroundColor: currentPage < totalPages - 1 ? const Color(0xFFFF782B).withOpacity(0.1) : Colors.grey.shade200,
+              backgroundColor: currentPage < totalPages - 1 ? const Color(0xFFFF782B).withValues(alpha: 0.1) : Colors.grey.shade200,
               foregroundColor: currentPage < totalPages - 1 ? const Color(0xFFFF782B) : Colors.grey,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),

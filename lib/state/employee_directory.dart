@@ -194,6 +194,8 @@ class EmployeeRecord {
     required this.primaryEmail,
     required this.personal,
     required this.professional,
+    CompensationInfo? compensation,
+    TaxInfo? tax,
   });
 
   final String id;
@@ -201,6 +203,8 @@ class EmployeeRecord {
   String primaryEmail;
   EmployeePersonalDetails personal;
   EmployeeProfessionalProfile professional;
+  CompensationInfo compensation = CompensationInfo.empty();
+  TaxInfo tax = TaxInfo.empty();
 
   EmployeeRecord copy() {
     return EmployeeRecord(
@@ -209,70 +213,17 @@ class EmployeeRecord {
       primaryEmail: primaryEmail,
       personal: personal.copy(),
       professional: professional.copy(),
-    );
+    )
+      ..compensation = compensation.copy()
+      ..tax = tax.copy();
   }
 }
 
 class EmployeeDirectory extends ChangeNotifier {
+  static const String fallbackEmployeeId = 'EMP001';
+
   EmployeeDirectory() {
-    final personal = EmployeePersonalDetails(
-      fullName: 'John Doe',
-      familyName: 'Robert Doe (Father), Jane Doe (Mother), Mary Doe (Spouse)',
-      corporateEmail: 'john.doe@apexnuera.com',
-      personalEmail: 'john.doe@gmail.com',
-      mobileNumber: '+91 98765 43210',
-      alternateMobileNumber: '+91 98765 43211',
-      currentAddress: '123 Main Street, Tech City, State - 123456',
-      permanentAddress: '456 Home Street, Hometown, State - 654321',
-      panId: 'ABCDE1234F',
-      aadharId: '1234 5678 9012',
-      dateOfBirth: DateTime(1990, 5, 15),
-      bloodGroup: 'O+',
-      assignedAssets: {'Laptop', 'Headphones'},
-      otherAssets: 'External Monitor',
-    );
-
-    final professional = EmployeeProfessionalProfile(
-      position: 'Senior Software Engineer',
-      employeeId: 'EMP001',
-      department: 'Engineering',
-      managerName: 'John Smith',
-      employmentType: 'Full time',
-      location: 'New York, NY',
-      workSpace: 'Hybrid',
-      jobLevel: 'Level 5',
-      startDate: DateTime(2022, 1, 15),
-      confirmationDate: DateTime(2022, 7, 15),
-      skills: 'Flutter, Dart, React, Node.js, Python, AWS',
-      education: [
-        EmployeeEducationEntry(
-          level: 'Highest Graduation',
-          institution: 'MIT',
-          degree: 'Bachelor of Computer Science',
-          year: '2020',
-          grade: 'A+',
-        ),
-      ],
-      employmentHistory: [
-        EmployeeEmploymentEntry(
-          companyName: 'Tech Corp',
-          designation: 'Software Developer',
-          fromDate: DateTime(2020, 6, 1),
-          toDate: DateTime(2022, 1, 14),
-        ),
-      ],
-    );
-
-    final seedEmployee = EmployeeRecord(
-      id: 'EMP001',
-      name: personal.fullName,
-      primaryEmail: personal.corporateEmail,
-      personal: personal,
-      professional: professional,
-    );
-
-    _employees[seedEmployee.id] = seedEmployee;
-    _primaryEmployeeId = seedEmployee.id;
+    _seedFallbackEmployee();
   }
 
   final Map<String, EmployeeRecord> _employees = <String, EmployeeRecord>{};
@@ -300,6 +251,13 @@ class EmployeeDirectory extends ChangeNotifier {
     }
   }
 
+  void _seedFallbackEmployee() {
+    if (!_employees.containsKey(fallbackEmployeeId)) {
+      _employees[fallbackEmployeeId] = _createFallbackEmployeeRecord();
+    }
+    _primaryEmployeeId = fallbackEmployeeId;
+  }
+
   void updatePersonalDetails(String id, EmployeePersonalDetails details) {
     final record = _employees[id];
     if (record == null) return;
@@ -313,6 +271,20 @@ class EmployeeDirectory extends ChangeNotifier {
     final record = _employees[id];
     if (record == null) return;
     record.professional = profile.copy();
+    notifyListeners();
+  }
+
+  void updateCompensation(String id, CompensationInfo data) {
+    final record = _employees[id];
+    if (record == null) return;
+    record.compensation = data.copy();
+    notifyListeners();
+  }
+
+  void updateTax(String id, TaxInfo data) {
+    final record = _employees[id];
+    if (record == null) return;
+    record.tax = data.copy();
     notifyListeners();
   }
 
@@ -340,4 +312,104 @@ class EmployeeDirectory extends ChangeNotifier {
     _employees.remove(id);
     notifyListeners();
   }
+
+  static EmployeeRecord _createFallbackEmployeeRecord() {
+    final personal = EmployeePersonalDetails(
+      fullName: 'John Doe',
+      familyName: '',
+      corporateEmail: 'john.doe@company.com',
+      personalEmail: 'john.doe@example.com',
+      mobileNumber: '',
+      alternateMobileNumber: '',
+      currentAddress: '',
+      permanentAddress: '',
+      panId: '',
+      aadharId: '',
+      dateOfBirth: null,
+      bloodGroup: '',
+      assignedAssets: <String>{},
+      otherAssets: '',
+      profileImageBytes: null,
+    );
+
+    final professional = EmployeeProfessionalProfile(
+      position: '',
+      employeeId: fallbackEmployeeId,
+      department: '',
+      managerName: '',
+      employmentType: '',
+      location: '',
+      workSpace: '',
+      jobLevel: '',
+      skills: '',
+    );
+
+    final record = EmployeeRecord(
+      id: fallbackEmployeeId,
+      name: personal.fullName,
+      primaryEmail: personal.corporateEmail,
+      personal: personal,
+      professional: professional,
+    );
+    record.compensation = CompensationInfo.empty();
+    record.tax = TaxInfo.empty();
+    return record;
+  }
+}
+
+class CompensationInfo {
+  CompensationInfo({
+    Map<String, double>? salaryComponents,
+    List<String>? payslips,
+    List<String>? bonuses,
+    List<String>? benefits,
+    List<String>? documents,
+    List<String>? reimbursements,
+    List<String>? policies,
+    List<String>? deductions,
+    String? selectedDeduction,
+  })  : salaryComponents = salaryComponents ?? <String, double>{},
+        payslips = payslips ?? <String>[],
+        bonuses = bonuses ?? <String>[],
+        benefits = benefits ?? <String>[],
+        documents = documents ?? <String>[],
+        reimbursements = reimbursements ?? <String>[],
+        policies = policies ?? <String>[],
+        deductions = deductions ?? <String>[],
+        selectedDeduction = selectedDeduction ?? '';
+
+  Map<String, double> salaryComponents; // e.g., basic, gross, net, traveling
+  List<String> payslips; // identifiers or URLs
+  List<String> bonuses;
+  List<String> benefits;
+  List<String> documents; // letters/agreements
+  List<String> reimbursements;
+  List<String> policies;
+  List<String> deductions; // dropdown options
+  String selectedDeduction;
+
+  CompensationInfo copy() {
+    return CompensationInfo(
+      salaryComponents: Map<String, double>.from(salaryComponents),
+      payslips: List<String>.from(payslips),
+      bonuses: List<String>.from(bonuses),
+      benefits: List<String>.from(benefits),
+      documents: List<String>.from(documents),
+      reimbursements: List<String>.from(reimbursements),
+      policies: List<String>.from(policies),
+      deductions: List<String>.from(deductions),
+      selectedDeduction: selectedDeduction,
+    );
+  }
+
+  factory CompensationInfo.empty() => CompensationInfo();
+}
+
+class TaxInfo {
+  TaxInfo({this.regime = ''}); // 'New' or 'Old'
+  String regime;
+
+  TaxInfo copy() => TaxInfo(regime: regime);
+
+  factory TaxInfo.empty() => TaxInfo();
 }

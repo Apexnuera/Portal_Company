@@ -157,12 +157,24 @@ class TimeSheetService extends ChangeNotifier {
   Future<bool> clockIn() async {
     try {
       final now = DateTime.now();
-      _todayAttendance = AttendanceRecord(
-        id: _todayAttendance!.id,
-        date: _todayAttendance!.date,
-        clockInTime: now,
-        status: 'Present',
-      );
+      if (_todayAttendance == null ||
+          _todayAttendance!.date.year != now.year ||
+          _todayAttendance!.date.month != now.month ||
+          _todayAttendance!.date.day != now.day) {
+        _todayAttendance = AttendanceRecord(
+          id: 'ATT-${now.year}${now.month}${now.day}',
+          date: DateTime(now.year, now.month, now.day),
+          clockInTime: now,
+          status: 'Present',
+        );
+      } else {
+        _todayAttendance = AttendanceRecord(
+          id: _todayAttendance!.id,
+          date: _todayAttendance!.date,
+          clockInTime: now,
+          status: 'Present',
+        );
+      }
       notifyListeners();
       return true;
     } catch (e) {

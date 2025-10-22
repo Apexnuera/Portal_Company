@@ -23,6 +23,10 @@ import 'pages/hr_post_job_page.dart';
 import 'pages/hr_post_internship_page.dart';
 import 'pages/employee_dashboard_page.dart';
 import 'services/auth_service.dart';
+import 'services/timesheet_service.dart';
+import 'services/compensation_service.dart';
+import 'services/faq_service.dart';
+import 'state/app_session.dart';
 import 'state/employee_directory.dart';
 
 void main() {
@@ -87,7 +91,7 @@ class MyApp extends StatelessWidget {
         ),
         GoRoute(path: '/register/employee', builder: (_, __) => const EmployeeRegistrationPage()),
         // Employee routes (protected by redirect)
-        GoRoute(path: '/employee/dashboard', builder: (_, __) => const EmployeeDashboardPage()),
+        GoRoute(path: '/employee/dashboard', builder: (_, __) => EmployeeDashboardPage()),
         // HR routes (protected by redirect)
         GoRoute(path: '/hr/dashboard', builder: (_, __) => HRDashboardPage()),
         GoRoute(path: '/hr/post/job', builder: (_, __) => HRPostJobPage()),
@@ -100,8 +104,20 @@ class MyApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<AppSession>(
+          create: (_) => AppSession(),
+        ),
         ChangeNotifierProvider<EmployeeDirectory>(
           create: (_) => EmployeeDirectory(),
+        ),
+        ChangeNotifierProvider<TimeSheetService>(
+          create: (_) => TimeSheetService.instance..initialize(),
+        ),
+        ChangeNotifierProvider<CompensationService>(
+          create: (_) => CompensationService.instance..initialize(),
+        ),
+        ChangeNotifierProvider<FaqService>(
+          create: (_) => FaqService.instance..initialize(),
         ),
       ],
       child: MaterialApp.router(

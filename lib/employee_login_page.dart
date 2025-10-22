@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/app_header_clean.dart';
 import 'services/auth_service.dart';
+import 'package:provider/provider.dart';
+import 'state/app_session.dart';
 
 class EmployeeLoginPage extends StatefulWidget {
   const EmployeeLoginPage({super.key});
@@ -125,6 +127,10 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                                   
                                   // Set employee as logged in and navigate to employee dashboard
                                   AuthService.instance.setEmployeeLoggedIn(true);
+
+                                  final appSession = context.read<AppSession>();
+                                  appSession.signIn(_emailController.text.trim());
+
                                   context.go('/employee/dashboard');
                                 }
                               },

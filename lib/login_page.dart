@@ -1,5 +1,5 @@
-1→import 'package:flutter/material.dart';
-    2→import 'widgets/app_header_clean.dart';
+import 'package:flutter/material.dart';
+import 'widgets/app_header_clean.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -17,7 +17,6 @@ class LoginPage extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final maxW = constraints.maxWidth;
-                // Compute card width so two cards fit side-by-side with spacing and padding
                 final horizontalPadding = isSmallScreen ? 16.0 : 32.0;
                 final spacing = 16.0;
                 final availableForCards = (maxW - horizontalPadding * 2 - spacing);
@@ -34,7 +33,6 @@ class LoginPage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.max,
                         children: [
-                          // Back Button to Home
                           Align(
                             alignment: Alignment.centerLeft,
                             child: TextButton.icon(
@@ -47,13 +45,10 @@ class LoginPage extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          // Header Icon
                           Icon(
                             Icons.login_outlined,
                             color: const Color(0xFFFF782B).withOpacity(0.8),
                           ),
-{{ ... }}
-                          // Title
                           Text(
                             'Choose Login Type',
                             style: TextStyle(
@@ -64,7 +59,6 @@ class LoginPage extends StatelessWidget {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 6),
-                          // Subtitle
                           Text(
                             'Select your role to continue',
                             style: TextStyle(
@@ -74,7 +68,6 @@ class LoginPage extends StatelessWidget {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 20),
-                          // Two cards side-by-side
                           Wrap(
                             alignment: WrapAlignment.center,
                             spacing: spacing,
@@ -145,7 +138,6 @@ class LoginPage extends StatelessWidget {
           padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
           child: Row(
             children: [
-              // Icon
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -159,8 +151,6 @@ class LoginPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              
-              // Text Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,8 +174,6 @@ class LoginPage extends StatelessWidget {
                   ],
                 ),
               ),
-              
-              // Arrow Icon
               Icon(
                 Icons.arrow_forward_ios,
                 color: const Color(0xFFFF782B).withOpacity(0.7),

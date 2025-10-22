@@ -1,9 +1,12 @@
+import 'dart:html' as html;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/timesheet_service.dart';
 
 import '../state/employee_directory.dart';
+import '../services/faq_service.dart';
 
 class HREmployeePortalPage extends StatefulWidget {
   const HREmployeePortalPage({super.key, required this.employeeId});
@@ -12,6 +15,159 @@ class HREmployeePortalPage extends StatefulWidget {
 
   @override
   State<HREmployeePortalPage> createState() => _HREmployeePortalPageState();
+}
+
+class _CompNumberField extends StatelessWidget {
+  final String label;
+  final String initial;
+  final bool isEditMode;
+  final ValueChanged<String> onChanged;
+  const _CompNumberField({required this.label, required this.initial, required this.isEditMode, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isEditMode) {
+      return _KeyValueTile(label, initial);
+    }
+    return SizedBox(
+      width: 260,
+      child: TextFormField(
+        initialValue: initial,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+class _KeyValueTile extends StatelessWidget {
+  final String label;
+  final String value;
+  const _KeyValueTile(this.label, this.value);
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 260,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
+          Text(value.isEmpty ? 'Not set' : value, style: const TextStyle(fontSize: 16)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader(this.title);
+  @override
+  Widget build(BuildContext context) {
+    return Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700));
+  }
+}
+
+class _SimpleEditableList extends StatefulWidget {
+  final List<String> items;
+  final bool isEditMode;
+  const _SimpleEditableList({required this.items, required this.isEditMode});
+
+  @override
+  State<_SimpleEditableList> createState() => _SimpleEditableListState();
+}
+
+class _SimpleEditableListState extends State<_SimpleEditableList> {
+  void _addItem() async {
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Item'),
+        content: TextField(controller: controller, decoration: const InputDecoration(labelText: 'Title/Note')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Add')),
+        ],
+      ),
+    );
+    if (text != null && text.isNotEmpty) {
+      setState(() => widget.items.insert(0, text));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) {
+      return Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('No data available'),
+            ),
+          ),
+          if (widget.isEditMode) const SizedBox(width: 12),
+          if (widget.isEditMode)
+            OutlinedButton.icon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Add')),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...widget.items.map((e) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.description_outlined),
+              title: Text(e),
+              trailing: widget.isEditMode
+                  ? IconButton(
+                      onPressed: () => setState(() => widget.items.remove(e)),
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    )
+                  : null,
+            )),
+        if (widget.isEditMode)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Add')),
+          ),
+      ],
+    );
+  }
+}
+
+class _MiniList extends StatelessWidget {
+  final List<Widget> children;
+  const _MiniList({required this.children});
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text('No data available'),
+      );
+    }
+    return Column(children: children);
+  }
 }
 
 class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
@@ -32,8 +188,8 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
     setState(() {
       if (!_isEditMode) {
         final directory = context.read<EmployeeDirectory>();
-        final record = directory.tryGetById(widget.employeeId) ??
-            directory.employees.first;
+        final record = directory.tryGetById(widget.employeeId);
+        if (record == null) return; // Handle missing record
         _workingRecord = record.copy();
       }
       _isEditMode = !_isEditMode;
@@ -45,6 +201,8 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
     directory.updatePersonalDetails(widget.employeeId, _workingRecord.personal);
     directory.updateProfessionalProfile(widget.employeeId, _workingRecord.professional);
     directory.updateProfileImage(widget.employeeId, _workingRecord.personal.profileImageBytes);
+    directory.updateCompensation(widget.employeeId, _workingRecord.compensation);
+    directory.updateTax(widget.employeeId, _workingRecord.tax);
     setState(() {
       _isEditMode = false; // Revert to read-only mode after saving
     });
@@ -56,8 +214,23 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
   @override
   Widget build(BuildContext context) {
     final directory = context.watch<EmployeeDirectory>();
-    final liveRecord = directory.tryGetById(widget.employeeId) ??
-        directory.employees.first;
+    final liveRecord = directory.tryGetById(widget.employeeId);
+    
+    // Handle missing employee record
+    if (liveRecord == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Employee Portal - Error'),
+          backgroundColor: const Color(0xFFFF782B),
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: Text('Error: Employee profile not found or corrupted.', 
+                style: TextStyle(fontSize: 18, color: Colors.red)),
+        ),
+      );
+    }
+    
     if (!_isEditMode) {
       _workingRecord = liveRecord.copy();
     }
@@ -322,15 +495,15 @@ class _PersonalDetailsEditorState extends State<_PersonalDetailsEditor> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _LabeledField('Full Name', _fullName, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Family Name', _familyName, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Corporate Email', _corporateEmail, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Personal Email', _personalEmail, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Mobile Number', _mobile, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Alternate Number', _alternateMobile, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Father or Mother or Spouse Name', _familyName, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Employee email id', _corporateEmail, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Personal email id', _personalEmail, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Contant number', _mobile, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Alternate number', _alternateMobile, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
           _LabeledField('Current Address', _currentAddress, maxLines: 3, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
           _LabeledField('Permanent Address', _permanentAddress, maxLines: 3, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('PAN ID', _panId, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Aadhar ID', _aadharId, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Pan', _panId, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Adhar', _aadharId, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
           _DatePickerField(
             label: 'Date of Birth',
             date: _dob,
@@ -371,7 +544,7 @@ class _PersonalDetailsEditorState extends State<_PersonalDetailsEditor> {
               ..selection = TextSelection.collapsed(offset: widget.personal.otherAssets.length),
             enabled: widget.isEditMode,
             decoration: InputDecoration(
-              labelText: 'Other Assets',
+              labelText: 'Asset details',
               border: const OutlineInputBorder(),
               filled: !widget.isEditMode,
               fillColor: !widget.isEditMode ? Colors.grey.shade50 : Colors.transparent,
@@ -404,6 +577,85 @@ class _ProfessionalProfileEditor extends StatefulWidget {
   State<_ProfessionalProfileEditor> createState() => _ProfessionalProfileEditorState();
 }
 
+class _HREducationEntryForm {
+  _HREducationEntryForm(EmployeeEducationEntry entry)
+      : level = entry.level,
+        institution = TextEditingController(text: entry.institution),
+        degree = TextEditingController(text: entry.degree),
+        year = TextEditingController(text: entry.year),
+        grade = TextEditingController(text: entry.grade),
+        documentName = entry.documentName,
+        documentBytes = entry.documentBytes != null
+            ? Uint8List.fromList(entry.documentBytes!)
+            : null;
+
+  String level;
+  final TextEditingController institution;
+  final TextEditingController degree;
+  final TextEditingController year;
+  final TextEditingController grade;
+  String? documentName;
+  Uint8List? documentBytes;
+
+  EmployeeEducationEntry toEntry() {
+    return EmployeeEducationEntry(
+      level: level,
+      institution: institution.text,
+      degree: degree.text,
+      year: year.text,
+      grade: grade.text,
+      documentName: documentName,
+      documentBytes: documentBytes != null
+          ? Uint8List.fromList(documentBytes!)
+          : null,
+    );
+  }
+
+  void dispose() {
+    institution.dispose();
+    degree.dispose();
+    year.dispose();
+    grade.dispose();
+  }
+}
+
+class _HREmploymentEntryForm {
+  _HREmploymentEntryForm(EmployeeEmploymentEntry entry)
+      : companyName = TextEditingController(text: entry.companyName),
+        designation = TextEditingController(text: entry.designation),
+        fromDate = entry.fromDate,
+        toDate = entry.toDate,
+        documentName = entry.documentName,
+        documentBytes = entry.documentBytes != null
+            ? Uint8List.fromList(entry.documentBytes!)
+            : null;
+
+  final TextEditingController companyName;
+  final TextEditingController designation;
+  DateTime? fromDate;
+  DateTime? toDate;
+  String? documentName;
+  Uint8List? documentBytes;
+
+  EmployeeEmploymentEntry toEntry() {
+    return EmployeeEmploymentEntry(
+      companyName: companyName.text,
+      designation: designation.text,
+      fromDate: fromDate,
+      toDate: toDate,
+      documentName: documentName,
+      documentBytes: documentBytes != null
+          ? Uint8List.fromList(documentBytes!)
+          : null,
+    );
+  }
+
+  void dispose() {
+    companyName.dispose();
+    designation.dispose();
+  }
+}
+
 class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> {
   late TextEditingController _position;
   late TextEditingController _employeeId;
@@ -413,7 +665,11 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
   late TextEditingController _location;
   late TextEditingController _workspace;
   late TextEditingController _jobLevel;
-  late TextEditingController _skills;
+  late TextEditingController _skillInput;
+  late List<String> _skills;
+  late List<_HREducationEntryForm> _educationForms;
+  late List<_HREmploymentEntryForm> _employmentForms;
+  final List<String> _defaultEducationLevels = <String>['10', '+2', 'Highest Degree'];
   DateTime? _startDate;
   DateTime? _confirmationDate;
 
@@ -428,7 +684,24 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
     _location = TextEditingController(text: widget.profile.location);
     _workspace = TextEditingController(text: widget.profile.workSpace);
     _jobLevel = TextEditingController(text: widget.profile.jobLevel);
-    _skills = TextEditingController(text: widget.profile.skills);
+    _skillInput = TextEditingController();
+    _skills = widget.profile.skills
+        .split(',')
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList();
+    _educationForms = widget.profile.education
+        .map(_HREducationEntryForm.new)
+        .toList();
+    final existingLevels = _educationForms.map((form) => form.level).toSet();
+    for (final level in _defaultEducationLevels) {
+      if (!existingLevels.contains(level)) {
+        _educationForms.add(_HREducationEntryForm(EmployeeEducationEntry(level: level)));
+      }
+    }
+    _employmentForms = widget.profile.employmentHistory
+        .map(_HREmploymentEntryForm.new)
+        .toList();
     _startDate = widget.profile.startDate;
     _confirmationDate = widget.profile.confirmationDate;
   }
@@ -443,7 +716,13 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
     _location.dispose();
     _workspace.dispose();
     _jobLevel.dispose();
-    _skills.dispose();
+    _skillInput.dispose();
+    for (final form in _educationForms) {
+      form.dispose();
+    }
+    for (final form in _employmentForms) {
+      form.dispose();
+    }
     super.dispose();
   }
 
@@ -461,19 +740,20 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
       setState(() {
         if (isStart) {
           _startDate = picked;
-          widget.profile.startDate = picked;
         } else {
           _confirmationDate = picked;
-          widget.profile.confirmationDate = picked;
         }
       });
-      widget.onChanged();
+      _writeBackProfile();
     }
   }
 
   void _applyChanges() {
-    if (!widget.isEditMode) return; // Only allow changes in edit mode
+    if (!widget.isEditMode) return;
+    _writeBackProfile();
+  }
 
+  void _writeBackProfile() {
     widget.profile
       ..position = _position.text
       ..employeeId = _employeeId.text
@@ -483,8 +763,83 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
       ..location = _location.text
       ..workSpace = _workspace.text
       ..jobLevel = _jobLevel.text
-      ..skills = _skills.text;
+      ..skills = _skills.join(', ')
+      ..education = _educationForms.map((form) => form.toEntry()).toList()
+      ..employmentHistory = _employmentForms.map((form) => form.toEntry()).toList()
+      ..startDate = _startDate
+      ..confirmationDate = _confirmationDate;
     widget.onChanged();
+  }
+
+  void _addSkill() {
+    if (!widget.isEditMode) return;
+    final value = _skillInput.text.trim();
+    if (value.isEmpty) return;
+    setState(() {
+      if (!_skills.contains(value)) {
+        _skills.add(value);
+      }
+      _skillInput.clear();
+    });
+    _writeBackProfile();
+  }
+
+  void _removeSkill(String skill) {
+    if (!widget.isEditMode) return;
+    setState(() {
+      _skills.remove(skill);
+    });
+    _writeBackProfile();
+  }
+
+  void _addEducationEntry() {
+    if (!widget.isEditMode) return;
+    setState(() {
+      _educationForms.add(_HREducationEntryForm(EmployeeEducationEntry()));
+    });
+    _writeBackProfile();
+  }
+
+  void _removeEducationEntry(int index) {
+    if (!widget.isEditMode) return;
+    setState(() {
+      _educationForms.removeAt(index).dispose();
+    });
+    _writeBackProfile();
+  }
+
+  Future<void> _pickEducationDocument(_HREducationEntryForm form) async {
+    if (!widget.isEditMode) return;
+    final input = html.FileUploadInputElement()
+      ..accept = '*/*'
+      ..click();
+    await input.onChange.first;
+    if (input.files == null || input.files!.isEmpty) {
+      return;
+    }
+    final file = input.files!.first;
+    final reader = html.FileReader()..readAsArrayBuffer(file);
+    await reader.onLoad.first;
+    final buffer = reader.result as ByteBuffer;
+    final bytes = buffer.asUint8List();
+    setState(() {
+      form
+        ..documentName = file.name
+        ..documentBytes = Uint8List.fromList(bytes);
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Uploaded ${file.name}')),
+    );
+    _writeBackProfile();
+  }
+
+  void _openDocument(String name, Uint8List? bytes) {
+    if (bytes == null) return;
+    final blob = html.Blob(<Uint8List>[bytes]);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.window.open(url, '_blank');
+    html.Url.revokeObjectUrl(url);
   }
 
   @override
@@ -495,29 +850,477 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _LabeledField('Position', _position, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Employee ID', _employeeId, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Employee Id', _employeeId, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
           _LabeledField('Department', _department, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Manager Name', _managerName, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Employment Type', _employmentType, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Manager name', _managerName, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          if (widget.isEditMode)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: DropdownButtonFormField<String>(
+                value: _employmentType.text.isEmpty ? null : _employmentType.text,
+                decoration: const InputDecoration(
+                  labelText: 'Employment type',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Full time', child: Text('Full time')),
+                  DropdownMenuItem(value: 'Contract', child: Text('Contract')),
+                  DropdownMenuItem(value: 'Intern', child: Text('Intern')),
+                ],
+                onChanged: (value) {
+                  _employmentType.text = value ?? '';
+                  _applyChanges();
+                },
+              ),
+            )
+          else
+            _LabeledField('Employment type', _employmentType, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
           _LabeledField('Location', _location, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Workspace', _workspace, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
-          _LabeledField('Job Level', _jobLevel, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Work space', _workspace, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          _LabeledField('Job level/Grade', _jobLevel, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
           _DatePickerField(
-            label: 'Start Date',
+            label: 'Start date',
             date: _startDate,
             onTap: () => _pickDate(isStart: true),
             isEditMode: widget.isEditMode,
           ),
           _DatePickerField(
-            label: 'Confirmation Date',
+            label: 'Confirmation date',
             date: _confirmationDate,
             onTap: () => _pickDate(isStart: false),
             isEditMode: widget.isEditMode,
           ),
-          _LabeledField('Skills', _skills, maxLines: 3, isEditMode: widget.isEditMode, onChanged: (_) => _applyChanges()),
+          const SizedBox(height: 32),
+          _buildEducationSection(),
+          const SizedBox(height: 32),
+          _buildSkillSection(),
+          const SizedBox(height: 32),
+          _buildEmploymentSection(),
         ],
       ),
     );
+  }
+
+  Widget _buildSkillSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Skillset',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (widget.isEditMode)
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _skillInput,
+                  decoration: const InputDecoration(
+                    labelText: 'Add skill',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (_) => _addSkill(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _addSkill,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF782B),
+                ),
+                child: const Text('Add'),
+              ),
+            ],
+          ),
+        if (widget.isEditMode) const SizedBox(height: 16),
+        _skills.isEmpty
+            ? Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'No skills added yet',
+                  style: TextStyle(fontSize: 16, color: Colors.black87),
+                ),
+              )
+            : Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _skills
+                    .map(
+                      (skill) => widget.isEditMode
+                          ? InputChip(
+                              label: Text(skill),
+                              onDeleted: () => _removeSkill(skill),
+                            )
+                          : Chip(label: Text(skill)),
+                    )
+                    .toList(),
+              ),
+      ],
+    );
+  }
+
+  Widget _buildEducationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Education Details',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Column(
+          children: _educationForms
+              .asMap()
+              .entries
+              .map((entry) => _buildEducationCard(entry.key, entry.value))
+              .toList(),
+        ),
+        if (widget.isEditMode) ...[
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _addEducationEntry,
+            icon: const Icon(Icons.add),
+            label: const Text('Add Education Entry'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEducationCard(int index, _HREducationEntryForm form) {
+    final availableLevels = <String>{..._defaultEducationLevels, if (form.level.isNotEmpty) form.level};
+    final levelField = widget.isEditMode
+        ? DropdownButtonFormField<String>(
+            value: form.level.isEmpty ? null : form.level,
+            decoration: const InputDecoration(
+              labelText: 'Education Level',
+              border: OutlineInputBorder(),
+            ),
+            items: availableLevels
+                .map((level) => DropdownMenuItem<String>(value: level, child: Text(level)))
+                .toList(),
+            onChanged: (value) {
+              setState(() {
+                form.level = value ?? '';
+              });
+              _writeBackProfile();
+            },
+          )
+        : _buildStaticField('Education Level', form.level);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: levelField),
+                if (widget.isEditMode)
+                  IconButton(
+                    tooltip: 'Remove entry',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => _removeEducationEntry(index),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildEducationTextField('Institution / School', form.institution),
+            const SizedBox(height: 16),
+            _buildEducationTextField('Degree / Course', form.degree),
+            const SizedBox(height: 16),
+            _buildEducationTextField('Year of Completion', form.year),
+            const SizedBox(height: 16),
+            _buildEducationTextField('Grade / Percentage', form.grade),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                if (form.documentName != null)
+                  TextButton.icon(
+                    onPressed: () => _openDocument(form.documentName!, form.documentBytes),
+                    icon: const Icon(Icons.visibility),
+                    label: Text(form.documentName!),
+                  )
+                else
+                  const Text('No document uploaded'),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: widget.isEditMode ? () => _pickEducationDocument(form) : null,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Upload Docs'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF782B),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEducationTextField(String label, TextEditingController controller) {
+    if (!widget.isEditMode) {
+      return _buildStaticField(label, controller.text);
+    }
+    return TextFormField(
+      controller: controller,
+      onChanged: (_) => _writeBackProfile(),
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _buildStaticField(String label, String value) {
+    return TextFormField(
+      enabled: false,
+      initialValue: value.isEmpty ? 'Not provided' : value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  Widget _buildEmploymentSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Previous Employment History',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Column(
+          children: _employmentForms
+              .asMap()
+              .entries
+              .map((entry) => _buildEmploymentCard(entry.key, entry.value))
+              .toList(),
+        ),
+        if (widget.isEditMode) ...[
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _addEmploymentEntry,
+            icon: const Icon(Icons.add),
+            label: const Text('Add Employment Entry'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEmploymentCard(int index, _HREmploymentEntryForm form) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: _buildEmploymentTextField('Company name', form.companyName)),
+                if (widget.isEditMode)
+                  IconButton(
+                    tooltip: 'Remove entry',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => _removeEmploymentEntry(index),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildEmploymentTextField('Designation', form.designation),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildEmploymentDateField(
+                    label: 'From date',
+                    value: form.fromDate,
+                    onTap: () => _pickEmploymentDate(
+                      initial: form.fromDate,
+                      onSelected: (value) => setState(() => form.fromDate = value),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildEmploymentDateField(
+                    label: 'To date',
+                    value: form.toDate,
+                    onTap: () => _pickEmploymentDate(
+                      initial: form.toDate,
+                      onSelected: (value) => setState(() => form.toDate = value),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                if (form.documentName != null)
+                  TextButton.icon(
+                    onPressed: () => _openDocument(form.documentName!, form.documentBytes),
+                    icon: const Icon(Icons.visibility),
+                    label: Text(form.documentName!),
+                  )
+                else
+                  const Text('No document uploaded'),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: widget.isEditMode ? () => _pickEmploymentDocument(form) : null,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Upload Docs'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF782B),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmploymentTextField(String label, TextEditingController controller) {
+    if (!widget.isEditMode) {
+      return _buildStaticField(label, controller.text);
+    }
+    return TextFormField(
+      controller: controller,
+      onChanged: (_) => _writeBackProfile(),
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _buildEmploymentDateField({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: widget.isEditMode ? onTap : null,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today,
+              size: 18,
+              color: widget.isEditMode ? const Color(0xFFFF782B) : Colors.grey,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              value == null ? 'Not set' : _formatDate(value),
+              style: const TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickEmploymentDate({
+    required DateTime? initial,
+    required ValueChanged<DateTime> onSelected,
+  }) async {
+    if (!widget.isEditMode) return;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial ?? DateTime.now(),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() {
+        onSelected(picked);
+      });
+      _writeBackProfile();
+    }
+  }
+
+  void _addEmploymentEntry() {
+    if (!widget.isEditMode) return;
+    setState(() {
+      _employmentForms.add(_HREmploymentEntryForm(EmployeeEmploymentEntry()));
+    });
+    _writeBackProfile();
+  }
+
+  void _removeEmploymentEntry(int index) {
+    if (!widget.isEditMode) return;
+    setState(() {
+      _employmentForms.removeAt(index).dispose();
+    });
+    _writeBackProfile();
+  }
+
+  Future<void> _pickEmploymentDocument(_HREmploymentEntryForm form) async {
+    if (!widget.isEditMode) return;
+    final input = html.FileUploadInputElement()
+      ..accept = '*/*'
+      ..click();
+    await input.onChange.first;
+    if (input.files == null || input.files!.isEmpty) {
+      return;
+    }
+    final file = input.files!.first;
+    final reader = html.FileReader()..readAsArrayBuffer(file);
+    await reader.onLoad.first;
+    final buffer = reader.result as ByteBuffer;
+    final bytes = buffer.asUint8List();
+    setState(() {
+      form
+        ..documentName = file.name
+        ..documentBytes = Uint8List.fromList(bytes);
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Uploaded ${file.name}')),
+    );
+    _writeBackProfile();
+  }
+
+  String _formatDate(DateTime value) {
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    final year = value.year.toString();
+    return '$day/$month/$year';
   }
 }
 
@@ -529,67 +1332,100 @@ class _CompensationEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final components = record.compensation.salaryComponents;
+    String getComp(String k) => (components[k] ?? 0).toString();
+    void setComp(String k, String v) {
+      final parsed = double.tryParse(v.trim());
+      if (parsed != null) components[k] = parsed;
+    }
+
+    final deductionOptions = record.compensation.deductions.isEmpty
+        ? <String>['None', 'PF', 'ESI', 'Professional Tax']
+        : record.compensation.deductions;
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isEditMode ? Colors.white : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.account_balance_wallet_outlined,
-              size: 64,
-              color: isEditMode ? const Color(0xFFFF782B) : Colors.grey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isEditMode ? 'Compensation Editor' : 'Compensation (View Mode)',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: isEditMode ? const Color(0xFFFF782B) : Colors.black87,
             ),
-            const SizedBox(height: 16),
-            Text(
-              isEditMode
-                  ? 'Compensation & Benefits Editor'
-                  : 'Compensation & Benefits (View Mode)',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isEditMode ? const Color(0xFFFF782B) : Colors.grey.shade700,
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              _CompNumberField(
+                label: 'Basic',
+                initial: getComp('basic'),
+                isEditMode: isEditMode,
+                onChanged: (v) => setComp('basic', v),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isEditMode
-                  ? 'Edit salary details, benefits, allowances, and tax information.'
-                  : 'View salary details, benefits, and compensation structure.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-                height: 1.5,
+              _CompNumberField(
+                label: 'Gross',
+                initial: getComp('gross'),
+                isEditMode: isEditMode,
+                onChanged: (v) => setComp('gross', v),
               ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isEditMode ? const Color(0xFFFF782B).withOpacity(0.1) : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isEditMode ? const Color(0xFFFF782B).withOpacity(0.3) : Colors.grey.shade300,
-                ),
+              _CompNumberField(
+                label: 'Net',
+                initial: getComp('net'),
+                isEditMode: isEditMode,
+                onChanged: (v) => setComp('net', v),
               ),
-              child: Text(
-                isEditMode
-                    ? 'Compensation editing features will be implemented here.'
-                    : 'Compensation details will be displayed here in view mode.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isEditMode ? const Color(0xFFFF782B) : Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
-                ),
+              _CompNumberField(
+                label: 'Traveling',
+                initial: getComp('traveling'),
+                isEditMode: isEditMode,
+                onChanged: (v) => setComp('traveling', v),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          isEditMode
+              ? DropdownButtonFormField<String>(
+                  value: record.compensation.selectedDeduction.isEmpty
+                      ? null
+                      : record.compensation.selectedDeduction,
+                  items: deductionOptions
+                      .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (v) => record.compensation.selectedDeduction = v ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'Deductions',
+                    border: OutlineInputBorder(),
+                  ),
+                )
+              : _KeyValueTile('Deductions',
+                  record.compensation.selectedDeduction.isEmpty ? 'None' : record.compensation.selectedDeduction),
+          const SizedBox(height: 16),
+          _SectionHeader('Payslips'),
+          _SimpleEditableList(
+            items: record.compensation.payslips,
+            isEditMode: isEditMode,
+          ),
+          const SizedBox(height: 12),
+          _SectionHeader('Bonuses & Incentives'),
+          _SimpleEditableList(items: record.compensation.bonuses, isEditMode: isEditMode),
+          const SizedBox(height: 12),
+          _SectionHeader('Benefits Summary'),
+          _SimpleEditableList(items: record.compensation.benefits, isEditMode: isEditMode),
+          const SizedBox(height: 12),
+          _SectionHeader('Compensation Letters/Agreements'),
+          _SimpleEditableList(items: record.compensation.documents, isEditMode: isEditMode),
+          const SizedBox(height: 12),
+          _SectionHeader('Reimbursements'),
+          _SimpleEditableList(items: record.compensation.reimbursements, isEditMode: isEditMode),
+          const SizedBox(height: 12),
+          _SectionHeader('Compensation Policies & FAQs'),
+          _SimpleEditableList(items: record.compensation.policies, isEditMode: isEditMode),
+        ],
       ),
     );
   }
@@ -603,67 +1439,37 @@ class _TaxInformationEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isEditMode ? Colors.white : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.assignment_outlined,
-              size: 64,
-              color: isEditMode ? const Color(0xFFFF782B) : Colors.grey,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isEditMode
-                  ? 'Tax Information Editor'
-                  : 'Tax Information (View Mode)',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isEditMode ? const Color(0xFFFF782B) : Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isEditMode
-                  ? 'Manage tax declarations, exemptions, and tax-saving investments.'
-                  : 'View tax-related information and declarations.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isEditMode ? const Color(0xFFFF782B).withOpacity(0.1) : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isEditMode ? const Color(0xFFFF782B).withOpacity(0.3) : Colors.grey.shade300,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isEditMode ? 'Tax Information Editor' : 'Tax Information (View Mode)',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.black87),
+          ),
+          const SizedBox(height: 16),
+          if (isEditMode)
+            Row(
+              children: [
+                Radio<String>(
+                  value: 'New',
+                  groupValue: record.tax.regime,
+                  onChanged: (v) => record.tax.regime = v ?? '',
                 ),
-              ),
-              child: Text(
-                isEditMode
-                    ? 'Tax information editing features will be implemented here.'
-                    : 'Tax information will be displayed here in view mode.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isEditMode ? const Color(0xFFFF782B) : Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
+                const Text('New tax regime'),
+                const SizedBox(width: 24),
+                Radio<String>(
+                  value: 'Old',
+                  groupValue: record.tax.regime,
+                  onChanged: (v) => record.tax.regime = v ?? '',
                 ),
-              ),
-            ),
-          ],
-        ),
+                const Text('Old tax regime'),
+              ],
+            )
+          else
+            _KeyValueTile('Selected Tax Regime', record.tax.regime.isEmpty ? 'Not selected' : record.tax.regime),
+        ],
       ),
     );
   }
@@ -677,67 +1483,50 @@ class _TimeSheetEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final ts = context.watch<TimeSheetService>();
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isEditMode ? Colors.white : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.access_time_outlined,
-              size: 64,
-              color: isEditMode ? const Color(0xFFFF782B) : Colors.grey,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isEditMode
-                  ? 'Time Sheet Editor'
-                  : 'Time Sheet (View Mode)',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isEditMode ? const Color(0xFFFF782B) : Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isEditMode
-                  ? 'Track work hours, manage leave requests, and submit timesheets.'
-                  : 'View attendance records and timesheet history.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isEditMode ? const Color(0xFFFF782B).withOpacity(0.1) : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isEditMode ? const Color(0xFFFF782B).withOpacity(0.3) : Colors.grey.shade300,
-                ),
-              ),
-              child: Text(
-                isEditMode
-                    ? 'Time sheet editing features will be implemented here.'
-                    : 'Time sheet records will be displayed here in view mode.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isEditMode ? const Color(0xFFFF782B) : Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Time Sheet (Read-Only)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          _SectionHeader('Attendance Records'),
+          _MiniList(
+            children: ts.attendanceRecords
+                .map((a) => ListTile(
+                      leading: const Icon(Icons.calendar_today),
+                      title: Text(ts.formatDate(a.date)),
+                      subtitle: Text('In: ${a.clockInTime != null ? ts.formatTime(a.clockInTime!) : '-'}  •  Out: ${a.clockOutTime != null ? ts.formatTime(a.clockOutTime!) : '-'}'),
+                      trailing: Text(a.status),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          _SectionHeader('Leave Requests'),
+          _MiniList(
+            children: ts.leaveRequests
+                .map((l) => ListTile(
+                      leading: const Icon(Icons.event_note),
+                      title: Text('${ts.formatDate(l.startDate)} - ${ts.formatDate(l.endDate)} (${l.totalDays} days)'),
+                      subtitle: Text(l.leaveType),
+                      trailing: Text(l.status),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          _SectionHeader('WFH Requests'),
+          _MiniList(
+            children: ts.wfhRequests
+                .map((w) => ListTile(
+                      leading: const Icon(Icons.home_work_outlined),
+                      title: Text(ts.formatDate(w.date)),
+                      subtitle: Text(w.reason),
+                      trailing: Text(w.status),
+                    ))
+                .toList(),
+          ),
+        ],
       ),
     );
   }
@@ -751,67 +1540,112 @@ class _FaqEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final faq = context.watch<FaqService>();
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isEditMode ? Colors.white : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.help_outline,
-              size: 64,
-              color: isEditMode ? const Color(0xFFFF782B) : Colors.grey,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isEditMode
-                  ? 'FAQ Editor'
-                  : 'FAQ (View Mode)',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isEditMode ? const Color(0xFFFF782B) : Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isEditMode
-                  ? 'Edit and manage frequently asked questions and answers.'
-                  : 'Browse frequently asked questions and support resources.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isEditMode ? 'FAQ Editor' : 'FAQ (View Mode)',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          if (faq.faqs.isEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isEditMode ? const Color(0xFFFF782B).withOpacity(0.1) : Colors.grey.shade100,
+                color: Colors.grey.shade50,
+                border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isEditMode ? const Color(0xFFFF782B).withOpacity(0.3) : Colors.grey.shade300,
-                ),
               ),
-              child: Text(
-                isEditMode
-                    ? 'FAQ editing features will be implemented here.'
-                    : 'FAQ content will be displayed here in view mode.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isEditMode ? const Color(0xFFFF782B) : Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
+              child: const Text('No FAQs available'),
+            ),
+          if (faq.faqs.isNotEmpty)
+            ...faq.faqs.map((f) => Card(
+                  child: ListTile(
+                    title: Text(f.question, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(f.answer),
+                    ),
+                    trailing: isEditMode
+                        ? Wrap(
+                            spacing: 8,
+                            children: [
+                              IconButton(
+                                tooltip: 'Edit',
+                                onPressed: () async {
+                                  final q = TextEditingController(text: f.question);
+                                  final a = TextEditingController(text: f.answer);
+                                  final updated = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Edit FAQ'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          TextField(controller: q, decoration: const InputDecoration(labelText: 'Question')),
+                                          const SizedBox(height: 8),
+                                          TextField(controller: a, decoration: const InputDecoration(labelText: 'Answer'), maxLines: 3),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                        ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+                                      ],
+                                    ),
+                                  );
+                                  if (updated == true) {
+                                    context.read<FaqService>().updateFaq(f.id, question: q.text.trim(), answer: a.text.trim());
+                                  }
+                                },
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                              IconButton(
+                                tooltip: 'Delete',
+                                onPressed: () => context.read<FaqService>().removeFaq(f.id),
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              ),
+                            ],
+                          )
+                        : null,
+                  ),
+                )),
+          if (isEditMode) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final q = TextEditingController();
+                final a = TextEditingController();
+                final create = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Add FAQ'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(controller: q, decoration: const InputDecoration(labelText: 'Question')),
+                        const SizedBox(height: 8),
+                        TextField(controller: a, decoration: const InputDecoration(labelText: 'Answer'), maxLines: 3),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Add')),
+                    ],
+                  ),
+                );
+                if (create == true && q.text.trim().isNotEmpty && a.text.trim().isNotEmpty) {
+                  context.read<FaqService>().addFaq(q.text.trim(), a.text.trim());
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Add FAQ'),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -1050,7 +1884,7 @@ class _ProfileImagePreview extends StatelessWidget {
         TextButton.icon(
           onPressed: onPick,
           icon: const Icon(Icons.upload),
-          label: const Text('Upload Profile Picture'),
+          label: const Text('Uploading profile picture (Control/Link)'),
         ),
       ],
     );
