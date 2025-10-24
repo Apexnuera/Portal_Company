@@ -4,9 +4,46 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/timesheet_service.dart';
-
 import '../state/employee_directory.dart';
 import '../services/faq_service.dart';
+import 'employee_dashboard_page.dart';
+
+// FAQ Read-only view
+class _FaqReadOnlyView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final faq = context.watch<FaqService>();
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("FAQs", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          if (faq.faqs.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('No FAQs available'),
+            )
+          else
+            ...faq.faqs.map((f) => Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.help_outline),
+                    title: Text(f.question, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Padding(padding: const EdgeInsets.only(top: 6), child: Text(f.answer)),
+                  ),
+                )),
+        ],
+      ),
+    );
+  }
+}
 
 class HREmployeePortalPage extends StatefulWidget {
   const HREmployeePortalPage({super.key, required this.employeeId});
@@ -172,44 +209,6 @@ class _MiniList extends StatelessWidget {
 
 class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
   int _selectedIndex = 0;
-  late EmployeeRecord _workingRecord;
-  bool _isEditMode = false; // Default to read-only mode
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final directory = context.read<EmployeeDirectory>();
-    final record = directory.tryGetById(widget.employeeId) ??
-        directory.employees.first;
-    _workingRecord = record.copy();
-  }
-
-  void _toggleEditMode() {
-    setState(() {
-      if (!_isEditMode) {
-        final directory = context.read<EmployeeDirectory>();
-        final record = directory.tryGetById(widget.employeeId);
-        if (record == null) return; // Handle missing record
-        _workingRecord = record.copy();
-      }
-      _isEditMode = !_isEditMode;
-    });
-  }
-
-  void _saveChanges() {
-    final directory = context.read<EmployeeDirectory>();
-    directory.updatePersonalDetails(widget.employeeId, _workingRecord.personal);
-    directory.updateProfessionalProfile(widget.employeeId, _workingRecord.professional);
-    directory.updateProfileImage(widget.employeeId, _workingRecord.personal.profileImageBytes);
-    directory.updateCompensation(widget.employeeId, _workingRecord.compensation);
-    directory.updateTax(widget.employeeId, _workingRecord.tax);
-    setState(() {
-      _isEditMode = false; // Revert to read-only mode after saving
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Changes saved successfully. Switched back to View Mode.')),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +219,7 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
     if (liveRecord == null) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Employee Portal - Error'),
+          title: const Text('Employee Portal - Error'),
           backgroundColor: const Color(0xFFFF782B),
           foregroundColor: Colors.white,
         ),
@@ -230,74 +229,54 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
         ),
       );
     }
-    
-    if (!_isEditMode) {
-      _workingRecord = liveRecord.copy();
-    }
 
     final tabs = <_PortalTab>[
       _PortalTab(
         icon: Icons.person_outline,
         label: 'Personal Details',
-        builder: (context) => _PersonalDetailsEditor(
-          personal: _workingRecord.personal,
-          onChanged: () => setState(() {}),
-          isEditMode: _isEditMode,
-        ),
+        builder: (context) => PersonalDetailsContent(employeeId: widget.employeeId),
       ),
       _PortalTab(
         icon: Icons.work_outline,
-        label: 'Professional Profile',
-        builder: (context) => _ProfessionalProfileEditor(
-          profile: _workingRecord.professional,
-          onChanged: () => setState(() {}),
-          isEditMode: _isEditMode,
+        label: 'Professional Details',
+        builder: (context) => ProfessionalProfileContent(
+          initialProfile: liveRecord.professional,
+          forceEditMode: false,
+          onSaved: (updated) {
+            directory.updateProfessionalProfile(widget.employeeId, updated);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Professional profile saved.')),
+            );
+          },
         ),
       ),
       _PortalTab(
         icon: Icons.account_balance_wallet_outlined,
         label: 'Compensation',
-        builder: (context) => _CompensationEditor(record: _workingRecord, isEditMode: _isEditMode),
+        builder: (context) => CompensationContent(employeeId: widget.employeeId),
       ),
       _PortalTab(
         icon: Icons.assignment_outlined,
         label: 'Tax Information',
-        builder: (context) => _TaxInformationEditor(record: _workingRecord, isEditMode: _isEditMode),
+        builder: (context) => TaxInformationContent(employeeId: widget.employeeId),
       ),
       _PortalTab(
         icon: Icons.access_time_outlined,
-        label: 'Time Sheet',
-        builder: (context) => _TimeSheetEditor(record: _workingRecord, isEditMode: _isEditMode),
+        label: 'Timesheet',
+        builder: (context) => TimeSheetContent(employeeId: widget.employeeId),
       ),
       _PortalTab(
         icon: Icons.help_outline,
-        label: "FAQ's",
-        builder: (context) => _FaqEditor(record: _workingRecord, isEditMode: _isEditMode),
+        label: "FAQs",
+        builder: (context) => _FaqReadOnlyView(),
       ),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Employee Portal — ${_workingRecord.personal.fullName}'),
-        backgroundColor: const Color(0xFFFF782B), // Orange theme from HR Dashboard
+        title: Text('Employee Portal — ${liveRecord.personal.fullName}'),
+        backgroundColor: const Color(0xFFFF782B), // Orange theme
         foregroundColor: Colors.white,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            child: ElevatedButton.icon(
-              onPressed: _isEditMode ? _saveChanges : _toggleEditMode,
-              icon: Icon(_isEditMode ? Icons.save : Icons.edit),
-              label: Text(_isEditMode ? 'Save Changes' : 'Edit'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isEditMode ? Colors.green : const Color(0xFFFF782B),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
       body: Column(
         children: [

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../utils/image_picker.dart';
 import '../state/employee_directory.dart';
 import '../services/timesheet_service.dart';
@@ -1080,7 +1081,7 @@ class EmployeeDashboardPage extends StatelessWidget {
                             )
                           : TabBarView(
                               children: [
-                                _PersonalDetailsReadOnlyView(employeeId: employeeId),
+                                PersonalDetailsContent(employeeId: employeeId),
                                 ProfessionalProfileContent(
                                   initialProfile: record.professional,
                                   forceEditMode: false,
@@ -1091,9 +1092,9 @@ class EmployeeDashboardPage extends StatelessWidget {
                                     );
                                   },
                                 ),
-                                _CompensationReadOnlyView(employeeId: employeeId),
-                                _TaxReadOnlyView(employeeId: employeeId),
-                                _TimeSheetEmployeeView(),
+                                CompensationContent(employeeId: employeeId),
+                                TaxInformationContent(employeeId: employeeId),
+                                TimeSheetContent(employeeId: employeeId),
                                 _FaqReadOnlyView(),
                               ],
                             ),
@@ -1150,7 +1151,19 @@ class _EmployeeTopHeader extends StatelessWidget {
           IconButton(tooltip: 'Alerts', onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No new alerts'))), icon: const Icon(Icons.notifications_none)),
           TextButton.icon(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact support: support@company.com'))), icon: const Icon(Icons.support_agent), label: const Text('Contact')),
           const SizedBox(width: 8),
-          CircleAvatar(radius: 16, child: record?.personal.profileImageBytes == null ? const Icon(Icons.person) : null),
+          GestureDetector(
+            onTap: () {
+              final bytes = record?.personal.profileImageBytes;
+              if (bytes != null) {
+                _showProfilePreview(context, bytes);
+              }
+            },
+            child: CircleAvatar(
+              radius: 16,
+              backgroundImage: record?.personal.profileImageBytes != null ? MemoryImage(record!.personal.profileImageBytes!) : null,
+              child: record?.personal.profileImageBytes == null ? const Icon(Icons.person) : null,
+            ),
+          ),
           const SizedBox(width: 8),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text((record?.personal.fullName.isNotEmpty == true ? record!.personal.fullName : 'John Doe'),
@@ -1158,9 +1171,39 @@ class _EmployeeTopHeader extends StatelessWidget {
             Text(employeeId, style: const TextStyle(fontSize: 11, color: Colors.grey)),
           ]),
           const SizedBox(width: 12),
-          TextButton.icon(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Logged out'))), icon: const Icon(Icons.logout, size: 18), label: const Text('Logout')),
+          TextButton.icon(
+            onPressed: () {
+              // Clear auth state and navigate to login
+              context.go('/login/employee');
+            },
+            icon: const Icon(Icons.logout, size: 18),
+            label: const Text('Logout'),
+          ),
         ],
       ),
+    );
+  }
+
+  void _showProfilePreview(BuildContext context, Uint8List bytes) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Profile Preview',
+      barrierColor: Colors.black87,
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, anim1, anim2) {
+        return GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Center(
+              child: InteractiveViewer(
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1227,110 +1270,844 @@ class _EmployeeSidebarState extends State<_EmployeeSidebar> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           item('Personal Details', Icons.person_outline, 0),
-          item('Professional Profile', Icons.badge_outlined, 1),
+          item('Professional Details', Icons.badge_outlined, 1),
           item('Compensation', Icons.account_balance_wallet_outlined, 2),
           item('Tax Information', Icons.assignment_outlined, 3),
-          item('Time Sheet', Icons.access_time, 4),
-          item("FAQ's", Icons.help_outline, 5),
+          item('Timesheet', Icons.access_time, 4),
+          item("FAQs", Icons.help_outline, 5),
         ],
       ),
     );
   }
 }
 
-class _PersonalDetailsReadOnlyView extends StatelessWidget {
-  const _PersonalDetailsReadOnlyView({required this.employeeId});
+class PersonalDetailsContent extends StatefulWidget {
+  const PersonalDetailsContent({
+    Key? key,
+    required this.employeeId,
+  }) : super(key: key);
+
   final String employeeId;
+
+  @override
+  State<PersonalDetailsContent> createState() => _PersonalDetailsContentState();
+}
+
+class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
+  bool _isEditMode = false;
+  late EmployeePersonalDetails _workingCopy;
+  final _formKey = GlobalKey<FormState>();
+
+  // Controllers
+  late TextEditingController _fullNameController;
+  late TextEditingController _familyNameController;
+  late TextEditingController _corporateEmailController;
+  late TextEditingController _personalEmailController;
+  late TextEditingController _mobileNumberController;
+  late TextEditingController _alternateMobileController;
+  late TextEditingController _currentAddressController;
+  late TextEditingController _permanentAddressController;
+  late TextEditingController _panIdController;
+  late TextEditingController _aadharIdController;
+  late TextEditingController _bloodGroupController;
+  late TextEditingController _otherAssetsController;
+  DateTime? _dateOfBirth;
+  Set<String> _selectedAssets = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeControllers();
+  }
+
+  void _initializeControllers() {
+    final directory = context.read<EmployeeDirectory>();
+    final record = directory.getById(widget.employeeId);
+    _workingCopy = record.personal.copy();
+    
+    _fullNameController = TextEditingController(text: _workingCopy.fullName);
+    _familyNameController = TextEditingController(text: _workingCopy.familyName);
+    _corporateEmailController = TextEditingController(text: _workingCopy.corporateEmail);
+    _personalEmailController = TextEditingController(text: _workingCopy.personalEmail);
+    _mobileNumberController = TextEditingController(text: _workingCopy.mobileNumber);
+    _alternateMobileController = TextEditingController(text: _workingCopy.alternateMobileNumber);
+    _currentAddressController = TextEditingController(text: _workingCopy.currentAddress);
+    _permanentAddressController = TextEditingController(text: _workingCopy.permanentAddress);
+    _panIdController = TextEditingController(text: _workingCopy.panId);
+    _aadharIdController = TextEditingController(text: _workingCopy.aadharId);
+    _bloodGroupController = TextEditingController(text: _workingCopy.bloodGroup);
+    _otherAssetsController = TextEditingController(text: _workingCopy.otherAssets);
+    _dateOfBirth = _workingCopy.dateOfBirth;
+    _selectedAssets = Set<String>.from(_workingCopy.assignedAssets);
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _familyNameController.dispose();
+    _corporateEmailController.dispose();
+    _personalEmailController.dispose();
+    _mobileNumberController.dispose();
+    _alternateMobileController.dispose();
+    _currentAddressController.dispose();
+    _permanentAddressController.dispose();
+    _panIdController.dispose();
+    _aadharIdController.dispose();
+    _bloodGroupController.dispose();
+    _otherAssetsController.dispose();
+    super.dispose();
+  }
+
+  void _toggleEditMode() {
+    setState(() {
+      if (_isEditMode) {
+        // Cancel edit mode - reset to original values
+        _initializeControllers();
+      }
+      _isEditMode = !_isEditMode;
+    });
+  }
+
+  void _saveChanges() {
+    if (_formKey.currentState?.validate() ?? false) {
+      // Update working copy with form values
+      _workingCopy.fullName = _fullNameController.text;
+      _workingCopy.familyName = _familyNameController.text;
+      _workingCopy.corporateEmail = _corporateEmailController.text;
+      _workingCopy.personalEmail = _personalEmailController.text;
+      _workingCopy.mobileNumber = _mobileNumberController.text;
+      _workingCopy.alternateMobileNumber = _alternateMobileController.text;
+      _workingCopy.currentAddress = _currentAddressController.text;
+      _workingCopy.permanentAddress = _permanentAddressController.text;
+      _workingCopy.panId = _panIdController.text;
+      _workingCopy.aadharId = _aadharIdController.text;
+      _workingCopy.bloodGroup = _bloodGroupController.text;
+      _workingCopy.dateOfBirth = _dateOfBirth;
+      _workingCopy.assignedAssets = _selectedAssets;
+      _workingCopy.otherAssets = _otherAssetsController.text;
+
+      // Save to directory
+      final directory = context.read<EmployeeDirectory>();
+      directory.updatePersonalDetails(widget.employeeId, _workingCopy);
+
+      setState(() {
+        _isEditMode = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Personal details saved successfully')),
+      );
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _dateOfBirth) {
+      setState(() {
+        _dateOfBirth = picked;
+      });
+    }
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Not set';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Widget _buildField(String label, TextEditingController controller, {
+    double width = 300,
+    bool enabled = true,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    if (!_isEditMode) {
+      return Container(
+        width: width,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 4),
+            Text(controller.text.isEmpty ? 'Not set' : controller.text, style: const TextStyle(fontSize: 16)),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: width,
+      child: TextFormField(
+        controller: controller,
+        enabled: enabled,
+        keyboardType: keyboardType,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          filled: true,
+          fillColor: enabled ? Colors.white : Colors.grey.shade100,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final directory = context.watch<EmployeeDirectory>();
-    final record = directory.getById(employeeId);
+    final record = directory.getById(widget.employeeId);
     final p = record.personal;
-    String fmtDate(DateTime? d) {
-      if (d == null) return '';
-      return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-    }
-    Widget field(String label, String value, {double width = 300}) {
-      return Container(
-        width: width,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade300)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          const SizedBox(height: 4),
-          Text(value.isEmpty ? 'Not set' : value, style: const TextStyle(fontSize: 16)),
-        ]),
-      );
-    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Personal Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 16),
-        Row(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundImage: p.profileImageBytes != null ? MemoryImage(p.profileImageBytes!) : null,
-              child: p.profileImageBytes == null ? const Icon(Icons.person, size: 32) : null,
+            Row(
+              children: [
+                const Text('Personal Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                const Spacer(),
+                if (!_isEditMode)
+                  ElevatedButton.icon(
+                    onPressed: _toggleEditMode,
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Edit'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF782B),
+                      foregroundColor: Colors.white,
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      OutlinedButton(
+                        onPressed: _toggleEditMode,
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: _saveChanges,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
-            const SizedBox(width: 16),
-            ElevatedButton.icon(
-              onPressed: () async {
-                try {
-                  final bytes = await ImagePickerWeb.pickImage();
-                  if (bytes != null && context.mounted) {
-                    context.read<EmployeeDirectory>().updateProfileImage(employeeId, bytes);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile picture updated')));
-                  }
-                } catch (_) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Image picking not supported on this platform')));
-                }
-              },
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Upload Profile Picture'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                _buildField('Full Name', _fullNameController),
+                _buildField('Father/Mother/Spouse Name', _familyNameController),
+                _buildField('Employee Email', _corporateEmailController),
+                _buildField('Personal Email', _personalEmailController),
+                _buildField('Contact Number', _mobileNumberController),
+                _buildField('Alternate Number', _alternateMobileController),
+                if (!_isEditMode)
+                  Container(
+                    width: 300,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Date of Birth', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        const SizedBox(height: 4),
+                        Text(_formatDate(_dateOfBirth), style: const TextStyle(fontSize: 16)),
+                      ],
+                    ),
+                  )
+                else
+                  SizedBox(
+                    width: 300,
+                    child: InkWell(
+                      onTap: () => _selectDate(context),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Date of Birth',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.calendar_today),
+                        ),
+                        child: Text(_formatDate(_dateOfBirth)),
+                      ),
+                    ),
+                  ),
+                _buildField('Blood Group', _bloodGroupController),
+                _buildField('Current Address', _currentAddressController, width: 400),
+                _buildField('Permanent Address', _permanentAddressController, width: 400),
+                _buildField('PAN', _panIdController),
+                _buildField('Aadhaar', _aadharIdController),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_isEditMode)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final bytes = await ImagePickerWeb.pickImage();
+                      if (bytes != null && context.mounted) {
+                        setState(() {
+                          _workingCopy.profileImageBytes = bytes;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Profile image selected. Click Save to apply.')),
+                        );
+                      }
+                    } catch (_) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Image picking not supported on this platform')));
+                    }
+                  },
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Upload Profile Picture'),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+                ),
+              ),
+            if (_isEditMode) const SizedBox(height: 12),
+            // Asset Details Section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Asset Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  if (!_isEditMode)
+                    ...[
+                      if (_selectedAssets.isEmpty && _otherAssetsController.text.isEmpty)
+                        const Text('No assets assigned')
+                      else
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final asset in _selectedAssets)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                child: Text('• $asset'),
+                              ),
+                            if (_otherAssetsController.text.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                child: Text('• ${_otherAssetsController.text}'),
+                              ),
+                          ],
+                        ),
+                    ]
+                  else
+                    ...[
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final asset in ['Laptop', 'Mobile', 'ID Card', 'Access Card'])
+                            FilterChip(
+                              label: Text(asset),
+                              selected: _selectedAssets.contains(asset),
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedAssets.add(asset);
+                                  } else {
+                                    _selectedAssets.remove(asset);
+                                  }
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _otherAssetsController,
+                        decoration: const InputDecoration(
+                          labelText: 'Other Assets',
+                          hintText: 'Enter any other assets',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
+                ],
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        Wrap(spacing: 16, runSpacing: 16, children: [
-          field('Full Name', p.fullName),
-          field('Father/Mother/Spouse', p.familyName),
-          field('Employee Email', p.corporateEmail),
-          field('Personal Email', p.personalEmail),
-          field('Contact Number', p.mobileNumber),
-          field('Alternative Number', p.alternateMobileNumber),
-          field('DOB', fmtDate(p.dateOfBirth)),
-          field('Blood Group', p.bloodGroup),
-          field('Current Address', p.currentAddress, width: 400),
-          field('Permanent Address', p.permanentAddress, width: 400),
-          field('PAN', p.panId),
-          field('Aadhar', p.aadharId),
-        ]),
+      ),
+    );
+  }
+}
+
+// Compensation Section with Edit/Save functionality
+class CompensationContent extends StatefulWidget {
+  const CompensationContent({Key? key, required this.employeeId}) : super(key: key);
+  final String employeeId;
+
+  @override
+  State<CompensationContent> createState() => _CompensationContentState();
+}
+
+class _CompensationContentState extends State<CompensationContent> {
+  bool _isEditMode = false;
+  late CompensationInfo _workingCopy;
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController _basicController;
+  late TextEditingController _netController;
+  late TextEditingController _grossController;
+  late TextEditingController _travelController;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeControllers();
+  }
+
+  void _initializeControllers() {
+    final directory = context.read<EmployeeDirectory>();
+    final record = directory.getById(widget.employeeId);
+    _workingCopy = record.compensation.copy();
+
+    _basicController = TextEditingController(text: _workingCopy.salaryComponents['basic']?.toString() ?? '0');
+    _netController = TextEditingController(text: _workingCopy.salaryComponents['net']?.toString() ?? '0');
+    _grossController = TextEditingController(text: _workingCopy.salaryComponents['gross']?.toString() ?? '0');
+    _travelController = TextEditingController(text: _workingCopy.salaryComponents['travel']?.toString() ?? '0');
+  }
+
+  @override
+  void dispose() {
+    _basicController.dispose();
+    _netController.dispose();
+    _grossController.dispose();
+    _travelController.dispose();
+    super.dispose();
+  }
+
+  void _toggleEditMode() {
+    setState(() {
+      if (_isEditMode) {
+        _initializeControllers();
+      }
+      _isEditMode = !_isEditMode;
+    });
+  }
+
+  void _saveChanges() {
+    if (_formKey.currentState?.validate() ?? false) {
+      _workingCopy.salaryComponents['basic'] = double.tryParse(_basicController.text) ?? 0;
+      _workingCopy.salaryComponents['net'] = double.tryParse(_netController.text) ?? 0;
+      _workingCopy.salaryComponents['gross'] = double.tryParse(_grossController.text) ?? 0;
+      _workingCopy.salaryComponents['travel'] = double.tryParse(_travelController.text) ?? 0;
+
+      final directory = context.read<EmployeeDirectory>();
+      directory.updateCompensation(widget.employeeId, _workingCopy);
+
+      setState(() => _isEditMode = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Compensation details saved successfully')),
+      );
+    }
+  }
+
+  Widget _buildSalaryField(String label, TextEditingController controller) {
+    if (!_isEditMode) {
+      return Container(
+        width: 220,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 4),
+            Text('₹ ${controller.text}', style: const TextStyle(fontSize: 16)),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 220,
+      child: TextFormField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixText: '₹ ',
+          border: const OutlineInputBorder(),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) return 'Required';
+          if (double.tryParse(value) == null) return 'Invalid number';
+          return null;
+        },
+      ),
+    );
+  }
+
+  void _addItem(String listType) async {
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Add $listType'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Description'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (text != null && text.isNotEmpty) {
+      setState(() {
+        switch (listType) {
+          case 'Payslip':
+            _workingCopy.payslips.add(text);
+            break;
+          case 'Bonus':
+            _workingCopy.bonuses.add(text);
+            break;
+          case 'Benefit':
+            _workingCopy.benefits.add(text);
+            break;
+          case 'Document':
+            _workingCopy.documents.add(text);
+            break;
+          case 'Reimbursement':
+            _workingCopy.reimbursements.add(text);
+            break;
+          case 'Policy':
+            _workingCopy.policies.add(text);
+            break;
+        }
+      });
+    }
+  }
+
+  Widget _buildEditableList(String title, List<String> items, String itemType) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         const SizedBox(height: 16),
+        Row(
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (_isEditMode) ...[
+              const Spacer(),
+              IconButton(
+                onPressed: () => _addItem(itemType),
+                icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFF782B)),
+                tooltip: 'Add $itemType',
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade300)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Asset detail', style: TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 4),
-            if (p.assignedAssets.isEmpty && (p.otherAssets.isEmpty))
-              const Text('No assets assigned')
-            else
-              Column(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: items.isEmpty
+              ? const Text('No data available')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: items.map((item) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text('• $item')),
+                          if (_isEditMode)
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              onPressed: () => setState(() => items.remove(item)),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('Compensation', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                const Spacer(),
+                if (!_isEditMode)
+                  ElevatedButton.icon(
+                    onPressed: _toggleEditMode,
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Edit'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF782B),
+                      foregroundColor: Colors.white,
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      OutlinedButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: _saveChanges,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text('Salary Structure', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 16,
+              runSpacing: 12,
+              children: [
+                _buildSalaryField('Basic', _basicController),
+                _buildSalaryField('Net', _netController),
+                _buildSalaryField('Gross', _grossController),
+                _buildSalaryField('Travel Allowance', _travelController),
+              ],
+            ),
+            _buildEditableList('Payslips', _workingCopy.payslips, 'Payslip'),
+            _buildEditableList('Bonuses & Incentives', _workingCopy.bonuses, 'Bonus'),
+            _buildEditableList('Benefits Summary', _workingCopy.benefits, 'Benefit'),
+            _buildEditableList('Compensation Letters/Agreements', _workingCopy.documents, 'Document'),
+            _buildEditableList('Reimbursements', _workingCopy.reimbursements, 'Reimbursement'),
+            _buildEditableList('Compensation Policies & FAQs', _workingCopy.policies, 'Policy'),
+            if (_isEditMode) ...[
+              const SizedBox(height: 16),
+              const Text('Deductions', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _workingCopy.selectedDeduction.isEmpty ? null : _workingCopy.selectedDeduction,
+                items: const [
+                  DropdownMenuItem(value: 'PF', child: Text('Provident Fund')),
+                  DropdownMenuItem(value: 'ESI', child: Text('ESI')),
+                  DropdownMenuItem(value: 'PT', child: Text('Professional Tax')),
+                  DropdownMenuItem(value: 'TDS', child: Text('TDS')),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Deduction Type',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _workingCopy.selectedDeduction = value ?? '';
+                  });
+                },
+              ),
+            ] else if (_workingCopy.selectedDeduction.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Selected Deduction', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    Text(_workingCopy.selectedDeduction, style: const TextStyle(fontSize: 16)),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Tax Information Section with Edit/Save functionality  
+class TaxInformationContent extends StatefulWidget {
+  const TaxInformationContent({Key? key, required this.employeeId}) : super(key: key);
+  final String employeeId;
+
+  @override
+  State<TaxInformationContent> createState() => _TaxInformationContentState();
+}
+
+class _TaxInformationContentState extends State<TaxInformationContent> {
+  bool _isEditMode = false;
+  late TaxInfo _workingCopy;
+  String? _selectedRegime;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeData();
+  }
+
+  void _initializeData() {
+    final directory = context.read<EmployeeDirectory>();
+    final record = directory.getById(widget.employeeId);
+    _workingCopy = record.tax.copy();
+    _selectedRegime = _workingCopy.regime.isEmpty ? null : _workingCopy.regime;
+  }
+
+  void _toggleEditMode() {
+    setState(() {
+      if (_isEditMode) {
+        _initializeData();
+      }
+      _isEditMode = !_isEditMode;
+    });
+  }
+
+  void _saveChanges() {
+    _workingCopy.regime = _selectedRegime ?? '';
+    
+    final directory = context.read<EmployeeDirectory>();
+    directory.updateTax(widget.employeeId, _workingCopy);
+
+    setState(() => _isEditMode = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Tax information saved successfully')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Tax Information', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              if (!_isEditMode)
+                ElevatedButton.icon(
+                  onPressed: _toggleEditMode,
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF782B),
+                    foregroundColor: Colors.white,
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    OutlinedButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: _saveChanges,
+                      icon: const Icon(Icons.save),
+                      label: const Text('Save'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (!_isEditMode)
+            Container(
+              width: 300,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final a in p.assignedAssets) Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text('- $a')),
-                  if (p.otherAssets.isNotEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text('- ${p.otherAssets}')),
+                  const Text('Selected Tax Regime', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 4),
+                  Text(_selectedRegime ?? 'Not selected', style: const TextStyle(fontSize: 16)),
                 ],
               ),
-          ]),
-        ),
-      ]),
+            )
+          else
+            SizedBox(
+              width: 300,
+              child: DropdownButtonFormField<String>(
+                value: _selectedRegime,
+                decoration: const InputDecoration(
+                  labelText: 'Tax Regime',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'New', child: Text('New Tax Regime')),
+                  DropdownMenuItem(value: 'Old', child: Text('Old Tax Regime')),
+                ],
+                onChanged: (value) => setState(() => _selectedRegime = value),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1365,7 +2142,10 @@ class _ReadOnlyPlaceholder extends StatelessWidget {
   }
 }
 
-class _TimeSheetEmployeeView extends StatelessWidget {
+class TimeSheetContent extends StatelessWidget {
+  const TimeSheetContent({Key? key, required this.employeeId}) : super(key: key);
+  final String employeeId;
+  
   @override
   Widget build(BuildContext context) {
     final ts = Provider.of<TimeSheetService>(context);
@@ -1668,46 +2448,7 @@ class _TimeSheetHolidayList extends StatelessWidget {
       ],
     );
   }
-}
 
-class _CompensationReadOnlyView extends StatelessWidget {
-  final String employeeId;
-  const _CompensationReadOnlyView({required this.employeeId});
-  @override
-  Widget build(BuildContext context) {
-    final directory = context.watch<EmployeeDirectory>();
-    final record = directory.getById(employeeId);
-    final comp = record.compensation;
-    String getC(String k) => (comp.salaryComponents[k] ?? 0).toString();
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Compensation (Read-Only)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              _KeyValue('Basic', getC('basic')),
-              _KeyValue('Gross', getC('gross')),
-              _KeyValue('Net', getC('net')),
-              _KeyValue('Traveling', getC('traveling')),
-              _KeyValue('Deductions', comp.selectedDeduction.isEmpty ? 'None' : comp.selectedDeduction),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _KeyList('Payslips', comp.payslips),
-          _KeyList('Bonuses & Incentives', comp.bonuses),
-          _KeyList('Benefits Summary', comp.benefits),
-          _KeyList('Compensation Letters/Agreements', comp.documents),
-          _KeyList('Reimbursements', comp.reimbursements),
-          _KeyList('Compensation Policies & FAQs', comp.policies),
-        ],
-      ),
-    );
-  }
 }
 
 class _TaxReadOnlyView extends StatelessWidget {
