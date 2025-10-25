@@ -7,6 +7,7 @@ import '../services/timesheet_service.dart';
 import '../state/employee_directory.dart';
 import '../services/faq_service.dart';
 import '../widgets/compensation_content.dart';
+import '../widgets/timesheet_content.dart';
 import 'employee_dashboard_page.dart';
 
 // FAQ Read-only view
@@ -286,7 +287,7 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
       _PortalTab(
         icon: Icons.access_time_outlined,
         label: 'Timesheet',
-        builder: (context) => TimeSheetContent(employeeId: widget.employeeId),
+        builder: (context) => TimeSheetContent(employeeId: widget.employeeId, isHrMode: true),
       ),
       _PortalTab(
         icon: Icons.help_outline,

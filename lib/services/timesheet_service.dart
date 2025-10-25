@@ -43,10 +43,12 @@ class LeaveRequest {
   final DateTime endDate;
   final String leaveType;
   final String reason;
-  final String status; // 'Pending', 'Approved', 'Rejected'
+  String status; // 'Pending', 'Approved', 'Rejected'
   final DateTime submittedDate;
   final DateTime? approvedDate;
   final String? approverComments;
+  final String? documentName;
+  final List<int>? documentBytes;
 
   LeaveRequest({
     required this.id,
@@ -58,6 +60,8 @@ class LeaveRequest {
     required this.submittedDate,
     this.approvedDate,
     this.approverComments,
+    this.documentName,
+    this.documentBytes,
   });
 
   int get totalDays {
@@ -69,7 +73,7 @@ class WFHRequest {
   final String id;
   final DateTime date;
   final String reason;
-  final String status; // 'Pending', 'Approved', 'Rejected'
+  String status; // 'Pending', 'Approved', 'Rejected'
   final DateTime submittedDate;
   final DateTime? approvedDate;
   final String? approverComments;
@@ -128,6 +132,27 @@ class TimeSheetService extends ChangeNotifier {
 
   bool get isClockedIn => _todayAttendance?.clockInTime != null && _todayAttendance?.clockOutTime == null;
   bool get isClockedOut => _todayAttendance?.clockOutTime != null;
+
+  // Check if can clock in (only once per day, only for today)
+  bool canClockIn() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Check if already clocked in today
+    if (_todayAttendance != null &&
+        _todayAttendance!.date.year == today.year &&
+        _todayAttendance!.date.month == today.month &&
+        _todayAttendance!.date.day == today.day &&
+        _todayAttendance!.clockInTime != null) {
+      return false;
+    }
+    return true;
+  }
+
+  // Check if can clock out
+  bool canClockOut() {
+    return isClockedIn && !isClockedOut;
+  }
 
   void initialize() {
     _initializeSampleData();
@@ -211,6 +236,7 @@ class TimeSheetService extends ChangeNotifier {
     required DateTime endDate,
     required String leaveType,
     required String reason,
+    dynamic document,
   }) async {
     try {
       final request = LeaveRequest(
@@ -221,6 +247,8 @@ class TimeSheetService extends ChangeNotifier {
         reason: reason,
         status: 'Pending',
         submittedDate: DateTime.now(),
+        documentName: document?.name,
+        documentBytes: document?.data,
       );
       
       _leaveRequests.insert(0, request);
@@ -311,5 +339,50 @@ class TimeSheetService extends ChangeNotifier {
     } catch (e) {
       return null;
     }
+  }
+
+  // HR Methods - Update Leave Request Status
+  void updateLeaveRequestStatus(String requestId, String newStatus) {
+    final index = _leaveRequests.indexWhere((r) => r.id == requestId);
+    if (index != -1) {
+      _leaveRequests[index].status = newStatus;
+      notifyListeners();
+    }
+  }
+
+  // HR Methods - Update WFH Request Status
+  void updateWFHRequestStatus(String requestId, String newStatus) {
+    final index = _wfhRequests.indexWhere((r) => r.id == requestId);
+    if (index != -1) {
+      _wfhRequests[index].status = newStatus;
+      notifyListeners();
+    }
+  }
+
+  // HR Methods - Add Holiday
+  void addHoliday({
+    required String name,
+    required DateTime date,
+    required String type,
+    String description = '',
+    bool isOptional = false,
+  }) {
+    final holiday = Holiday(
+      id: 'HOL-${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      date: date,
+      type: type,
+      description: description,
+      isOptional: isOptional,
+    );
+    _holidays.add(holiday);
+    _holidays.sort((a, b) => a.date.compareTo(b.date));
+    notifyListeners();
+  }
+
+  // HR Methods - Remove Holiday
+  void removeHoliday(String holidayId) {
+    _holidays.removeWhere((h) => h.id == holidayId);
+    notifyListeners();
   }
 }

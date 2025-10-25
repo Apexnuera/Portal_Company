@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import '../utils/image_picker.dart';
-import '../state/employee_directory.dart';
 import '../services/timesheet_service.dart';
+import '../state/employee_directory.dart';
 import '../services/faq_service.dart';
+import '../widgets/timesheet_content.dart';
 import '../utils/document_picker.dart';
 import '../widgets/compensation_content.dart';
+import 'dart:html' as html;
 
 class ProfessionalProfileContent extends StatefulWidget {
   final EmployeeProfessionalProfile initialProfile;
@@ -1182,7 +1182,7 @@ class _EmployeeTopHeader extends StatelessWidget {
           TextButton.icon(
             onPressed: () {
               // Clear auth state and navigate to login
-              context.go('/login/employee');
+              Navigator.of(context).pushReplacementNamed('/login/employee');
             },
             icon: const Icon(Icons.logout, size: 18),
             label: const Text('Logout'),
@@ -1581,17 +1581,27 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     try {
-                      final bytes = await ImagePickerWeb.pickImage();
-                      if (bytes != null && context.mounted) {
-                        setState(() {
-                          _workingCopy.profileImageBytes = bytes;
-                        });
+                      final input = html.FileUploadInputElement()..accept = 'image/*';
+                      input.click();
+                      await input.onChange.first;
+                      if (input.files!.isNotEmpty) {
+                        final file = input.files!.first;
+                        final reader = html.FileReader();
+                        reader.readAsArrayBuffer(file);
+                        await reader.onLoad.first;
+                        final bytes = reader.result as List<int>;
+                        if (context.mounted) {
+                          setState(() {
+                            _workingCopy.profileImageBytes = Uint8List.fromList(bytes);
+                          });
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Profile image selected. Click Save to apply.')),
+                          SnackBar(content: Text('Failed to pick image: $e')),
                         );
                       }
-                    } catch (_) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Image picking not supported on this platform')));
                     }
                   },
                   icon: const Icon(Icons.upload_file),
@@ -1677,52 +1687,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
 }
 
 
-class TimeSheetContent extends StatelessWidget {
-  const TimeSheetContent({Key? key, required this.employeeId}) : super(key: key);
-  final String employeeId;
-
-  @override
-  Widget build(BuildContext context) {
-    final ts = Provider.of<TimeSheetService>(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ElevatedButton.icon(
-                onPressed: ts.isClockedIn ? null : () => ts.clockIn(),
-                icon: const Icon(Icons.login),
-                label: const Text('Clock In'),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: ts.isClockedIn && !ts.isClockedOut ? () => ts.clockOut() : null,
-                icon: const Icon(Icons.logout),
-                label: const Text('Clock Out'),
-              ),
-              const SizedBox(width: 16),
-              if (ts.todayAttendance != null)
-                Text('Today: '
-                    '${ts.todayAttendance!.clockInTime != null ? 'In ${ts.formatTime(ts.todayAttendance!.clockInTime!)}' : '-'}'
-                    ' • '
-                    '${ts.todayAttendance!.clockOutTime != null ? 'Out ${ts.formatTime(ts.todayAttendance!.clockOutTime!)}' : '-'}'),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const _TimeSheetLeaveForm(),
-          const SizedBox(height: 24),
-          const _TimeSheetWFHForm(),
-          const SizedBox(height: 24),
-          const _TimeSheetAttendanceList(),
-          const SizedBox(height: 24),
-          const _TimeSheetHolidayList(),
-        ],
-      ),
-    );
-  }
-}
+// TimeSheetContent is now in widgets/timesheet_content.dart
 
 class TaxInformationContent extends StatelessWidget {
   const TaxInformationContent({Key? key, required this.employeeId}) : super(key: key);
@@ -1761,266 +1726,7 @@ class _KeyValueTile extends StatelessWidget {
   }
 }
 
-class _TimeSheetAttendanceList extends StatelessWidget {
-  const _TimeSheetAttendanceList();
-
-  @override
-  Widget build(BuildContext context) {
-    final ts = Provider.of<TimeSheetService>(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Attendance Records', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Container(
-          height: 300,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: ts.attendanceRecords.isEmpty
-              ? const Center(child: Text('No data available'))
-              : ListView.builder(
-                  itemCount: ts.attendanceRecords.length,
-                  itemBuilder: (context, index) {
-                    final a = ts.attendanceRecords[index];
-                    return ListTile(
-                      leading: const Icon(Icons.calendar_today),
-                      title: Text(ts.formatDate(a.date)),
-                      subtitle: Text('In: ${a.clockInTime != null ? ts.formatTime(a.clockInTime!) : '-'}  •  Out: ${a.clockOutTime != null ? ts.formatTime(a.clockOutTime!) : '-'}  •  ${a.workingHoursFormatted}'),
-                      trailing: Text(a.status),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TimeSheetLeaveForm extends StatefulWidget {
-  const _TimeSheetLeaveForm();
-  @override
-  State<_TimeSheetLeaveForm> createState() => _TimeSheetLeaveFormState();
-}
-
-class _TimeSheetLeaveFormState extends State<_TimeSheetLeaveForm> {
-  DateTime? _start;
-  DateTime? _end;
-  String? _type;
-  final _reason = TextEditingController();
-
-  @override
-  void dispose() {
-    _reason.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate({required bool start}) async {
-    final ts = Provider.of<TimeSheetService>(context, listen: false);
-    final initial = start ? (_start ?? DateTime.now()) : (_end ?? _start ?? DateTime.now());
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(1950),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked != null) {
-      setState(() {
-        if (start) {
-          _start = picked;
-          if (_end != null && _end!.isBefore(_start!)) _end = _start;
-        } else {
-          _end = picked;
-        }
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ts = Provider.of<TimeSheetService>(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Leave Request', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 16,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 220,
-              child: DropdownButtonFormField<String>(
-                value: _type,
-                items: ts.leaveTypes.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                decoration: const InputDecoration(labelText: 'Leave type', border: OutlineInputBorder()),
-                onChanged: (v) => setState(() => _type = v),
-              ),
-            ),
-            SizedBox(
-              width: 220,
-              child: OutlinedButton.icon(
-                onPressed: () => _pickDate(start: true),
-                icon: const Icon(Icons.date_range),
-                label: Text(_start == null ? 'Start date' : ts.formatDate(_start!)),
-              ),
-            ),
-            SizedBox(
-              width: 220,
-              child: OutlinedButton.icon(
-                onPressed: () => _pickDate(start: false),
-                icon: const Icon(Icons.date_range),
-                label: Text(_end == null ? 'End date' : ts.formatDate(_end!)),
-              ),
-            ),
-            SizedBox(
-              width: 320,
-              child: TextField(
-                controller: _reason,
-                decoration: const InputDecoration(labelText: 'Reason', border: OutlineInputBorder()),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: _type != null && _start != null && _end != null && _reason.text.trim().isNotEmpty
-                  ? () async {
-                      final ok = await ts.submitLeaveRequest(
-                        startDate: _start!,
-                        endDate: _end!,
-                        leaveType: _type!,
-                        reason: _reason.text.trim(),
-                      );
-                      if (ok && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Leave request submitted')));
-                        setState(() {
-                          _start = null;
-                          _end = null;
-                          _type = null;
-                          _reason.clear();
-                        });
-                      }
-                    }
-                  : null,
-              child: const Text('Submit Leave'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _TimeSheetWFHForm extends StatefulWidget {
-  const _TimeSheetWFHForm();
-  @override
-  State<_TimeSheetWFHForm> createState() => _TimeSheetWFHFormState();
-}
-
-class _TimeSheetWFHFormState extends State<_TimeSheetWFHForm> {
-  DateTime? _date;
-  final _reason = TextEditingController();
-
-  @override
-  void dispose() {
-    _reason.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date ?? DateTime.now(),
-      firstDate: DateTime(1950),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked != null) setState(() => _date = picked);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ts = Provider.of<TimeSheetService>(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('WFH Request', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 16,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            OutlinedButton.icon(
-              onPressed: _pickDate,
-              icon: const Icon(Icons.date_range),
-              label: Text(_date == null ? 'Select date' : ts.formatDate(_date!)),
-            ),
-            SizedBox(
-              width: 320,
-              child: TextField(
-                controller: _reason,
-                decoration: const InputDecoration(labelText: 'Reason', border: OutlineInputBorder()),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: _date != null && _reason.text.trim().isNotEmpty
-                  ? () async {
-                      final ok = await ts.submitWFHRequest(date: _date!, reason: _reason.text.trim());
-                      if (ok && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WFH request submitted')));
-                        setState(() {
-                          _date = null;
-                          _reason.clear();
-                        });
-                      }
-                    }
-                  : null,
-              child: const Text('Submit WFH'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _TimeSheetHolidayList extends StatelessWidget {
-  const _TimeSheetHolidayList();
-  @override
-  Widget build(BuildContext context) {
-    final ts = Provider.of<TimeSheetService>(context);
-    final now = DateTime.now();
-    final holidays = ts.getHolidaysForMonth(now.year, now.month);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Holiday Calendar', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Container(
-          height: 400,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: holidays.isEmpty
-              ? const Center(child: Text('No data available'))
-              : ListView.builder(
-                  itemCount: holidays.length,
-                  itemBuilder: (context, index) {
-                    final h = holidays[index];
-                    return ListTile(
-                      leading: const Icon(Icons.event_available),
-                      title: Text('${h.name} (${h.type})'),
-                      subtitle: Text(ts.formatDate(h.date)),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-}
+// Old timesheet widgets removed - now using widgets/timesheet_tabs.dart
 
 class _TaxReadOnlyView extends StatelessWidget {
   final String employeeId;
