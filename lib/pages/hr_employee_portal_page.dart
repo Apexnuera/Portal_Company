@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../services/timesheet_service.dart';
 import '../state/employee_directory.dart';
 import '../services/faq_service.dart';
+import '../widgets/compensation_content.dart';
 import 'employee_dashboard_page.dart';
 
 // FAQ Read-only view
@@ -210,6 +211,28 @@ class _MiniList extends StatelessWidget {
 class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
   int _selectedIndex = 0;
 
+  void _showProfilePreview(BuildContext context, Uint8List bytes) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(10),
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: InteractiveViewer(
+              panEnabled: false,
+              boundaryMargin: const EdgeInsets.all(80),
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image.memory(bytes),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final directory = context.watch<EmployeeDirectory>();
@@ -234,7 +257,7 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
       _PortalTab(
         icon: Icons.person_outline,
         label: 'Personal Details',
-        builder: (context) => PersonalDetailsContent(employeeId: widget.employeeId),
+        builder: (context) => PersonalDetailsContent(employeeId: widget.employeeId, isHrMode: true),
       ),
       _PortalTab(
         icon: Icons.work_outline,
@@ -253,7 +276,7 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
       _PortalTab(
         icon: Icons.account_balance_wallet_outlined,
         label: 'Compensation',
-        builder: (context) => CompensationContent(employeeId: widget.employeeId),
+        builder: (context) => CompensationContent(employeeId: widget.employeeId, isHrMode: true),
       ),
       _PortalTab(
         icon: Icons.assignment_outlined,
@@ -277,6 +300,26 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
         title: Text('Employee Portal — ${liveRecord.personal.fullName}'),
         backgroundColor: const Color(0xFFFF782B), // Orange theme
         foregroundColor: Colors.white,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: GestureDetector(
+              onTap: () {
+                if (liveRecord.personal.profileImageBytes != null) {
+                  _showProfilePreview(context, liveRecord.personal.profileImageBytes!);
+                }
+              },
+              child: CircleAvatar(
+                backgroundImage: liveRecord.personal.profileImageBytes != null
+                    ? MemoryImage(liveRecord.personal.profileImageBytes!)
+                    : null,
+                child: liveRecord.personal.profileImageBytes == null
+                    ? const Icon(Icons.person_outline)
+                    : null,
+              ),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -1303,112 +1346,6 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
   }
 }
 
-class _CompensationEditor extends StatelessWidget {
-  const _CompensationEditor({required this.record, required this.isEditMode});
-
-  final EmployeeRecord record;
-  final bool isEditMode;
-
-  @override
-  Widget build(BuildContext context) {
-    final components = record.compensation.salaryComponents;
-    String getComp(String k) => (components[k] ?? 0).toString();
-    void setComp(String k, String v) {
-      final parsed = double.tryParse(v.trim());
-      if (parsed != null) components[k] = parsed;
-    }
-
-    final deductionOptions = record.compensation.deductions.isEmpty
-        ? <String>['None', 'PF', 'ESI', 'Professional Tax']
-        : record.compensation.deductions;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isEditMode ? 'Compensation Editor' : 'Compensation (View Mode)',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: isEditMode ? const Color(0xFFFF782B) : Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              _CompNumberField(
-                label: 'Basic',
-                initial: getComp('basic'),
-                isEditMode: isEditMode,
-                onChanged: (v) => setComp('basic', v),
-              ),
-              _CompNumberField(
-                label: 'Gross',
-                initial: getComp('gross'),
-                isEditMode: isEditMode,
-                onChanged: (v) => setComp('gross', v),
-              ),
-              _CompNumberField(
-                label: 'Net',
-                initial: getComp('net'),
-                isEditMode: isEditMode,
-                onChanged: (v) => setComp('net', v),
-              ),
-              _CompNumberField(
-                label: 'Traveling',
-                initial: getComp('traveling'),
-                isEditMode: isEditMode,
-                onChanged: (v) => setComp('traveling', v),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          isEditMode
-              ? DropdownButtonFormField<String>(
-                  value: record.compensation.selectedDeduction.isEmpty
-                      ? null
-                      : record.compensation.selectedDeduction,
-                  items: deductionOptions
-                      .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) => record.compensation.selectedDeduction = v ?? '',
-                  decoration: const InputDecoration(
-                    labelText: 'Deductions',
-                    border: OutlineInputBorder(),
-                  ),
-                )
-              : _KeyValueTile('Deductions',
-                  record.compensation.selectedDeduction.isEmpty ? 'None' : record.compensation.selectedDeduction),
-          const SizedBox(height: 16),
-          _SectionHeader('Payslips'),
-          _SimpleEditableList(
-            items: record.compensation.payslips,
-            isEditMode: isEditMode,
-          ),
-          const SizedBox(height: 12),
-          _SectionHeader('Bonuses & Incentives'),
-          _SimpleEditableList(items: record.compensation.bonuses, isEditMode: isEditMode),
-          const SizedBox(height: 12),
-          _SectionHeader('Benefits Summary'),
-          _SimpleEditableList(items: record.compensation.benefits, isEditMode: isEditMode),
-          const SizedBox(height: 12),
-          _SectionHeader('Compensation Letters/Agreements'),
-          _SimpleEditableList(items: record.compensation.documents, isEditMode: isEditMode),
-          const SizedBox(height: 12),
-          _SectionHeader('Reimbursements'),
-          _SimpleEditableList(items: record.compensation.reimbursements, isEditMode: isEditMode),
-          const SizedBox(height: 12),
-          _SectionHeader('Compensation Policies & FAQs'),
-          _SimpleEditableList(items: record.compensation.policies, isEditMode: isEditMode),
-        ],
-      ),
-    );
-  }
-}
 
 class _TaxInformationEditor extends StatelessWidget {
   const _TaxInformationEditor({required this.record, required this.isEditMode});

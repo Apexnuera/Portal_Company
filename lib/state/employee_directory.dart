@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import '../utils/document_picker.dart';
 
 class EmployeePersonalDetails {
   EmployeePersonalDetails({
@@ -288,6 +289,75 @@ class EmployeeDirectory extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateCompensationValue(String id, {double? basic, double? gross, double? net, double? travelAllowance}) {
+    final record = _employees[id];
+    if (record == null) return;
+    if (basic != null) record.compensation.basic = basic;
+    if (gross != null) record.compensation.gross = gross;
+    if (net != null) record.compensation.net = net;
+    if (travelAllowance != null) record.compensation.travelAllowance = travelAllowance;
+    notifyListeners();
+  }
+
+  void addCompensationDocument(String id, String type, DocumentFile file) {
+    final record = _employees[id];
+    if (record == null) return;
+    final doc = CompensationDocument(name: file.name, date: DateTime.now(), data: file.data);
+    switch (type) {
+      case 'Payslips':
+        record.compensation.payslips.add(doc);
+        break;
+      case 'Bonuses and Incentives':
+        record.compensation.bonusesAndIncentives.add(doc);
+        break;
+      case 'Benefits Summary':
+        record.compensation.benefitsSummary.add(doc);
+        break;
+      case 'Compensation Letters / Agreements':
+        record.compensation.compensationLetters.add(doc);
+        break;
+      case 'Offer Letters':
+        record.compensation.offerLetters.add(doc);
+        break;
+      case 'Reimbursements':
+        record.compensation.reimbursements.add(doc);
+        break;
+      case 'Compensation Policies and FAQs':
+        record.compensation.compensationPolicies.add(doc);
+        break;
+    }
+    notifyListeners();
+  }
+
+  void removeCompensationDocument(String id, String type, CompensationDocument doc) {
+    final record = _employees[id];
+    if (record == null) return;
+    switch (type) {
+      case 'Payslips':
+        record.compensation.payslips.remove(doc);
+        break;
+      case 'Bonuses and Incentives':
+        record.compensation.bonusesAndIncentives.remove(doc);
+        break;
+      case 'Benefits Summary':
+        record.compensation.benefitsSummary.remove(doc);
+        break;
+      case 'Compensation Letters / Agreements':
+        record.compensation.compensationLetters.remove(doc);
+        break;
+      case 'Offer Letters':
+        record.compensation.offerLetters.remove(doc);
+        break;
+      case 'Reimbursements':
+        record.compensation.reimbursements.remove(doc);
+        break;
+      case 'Compensation Policies and FAQs':
+        record.compensation.compensationPolicies.remove(doc);
+        break;
+    }
+    notifyListeners();
+  }
+
   void updateProfileImage(String id, Uint8List? bytes) {
     final record = _employees[id];
     if (record == null) return;
@@ -357,48 +427,72 @@ class EmployeeDirectory extends ChangeNotifier {
   }
 }
 
+class CompensationDocument {
+  CompensationDocument({
+    required this.name,
+    required this.date,
+    required this.data,
+  });
+
+  final String name;
+  final DateTime date;
+  final Uint8List data;
+
+  CompensationDocument copy() {
+    return CompensationDocument(
+      name: name,
+      date: date,
+      data: Uint8List.fromList(data),
+    );
+  }
+}
+
 class CompensationInfo {
   CompensationInfo({
-    Map<String, double>? salaryComponents,
-    List<String>? payslips,
-    List<String>? bonuses,
-    List<String>? benefits,
-    List<String>? documents,
-    List<String>? reimbursements,
-    List<String>? policies,
-    List<String>? deductions,
-    String? selectedDeduction,
-  })  : salaryComponents = salaryComponents ?? <String, double>{},
-        payslips = payslips ?? <String>[],
-        bonuses = bonuses ?? <String>[],
-        benefits = benefits ?? <String>[],
-        documents = documents ?? <String>[],
-        reimbursements = reimbursements ?? <String>[],
-        policies = policies ?? <String>[],
-        deductions = deductions ?? <String>[],
-        selectedDeduction = selectedDeduction ?? '';
+    this.basic = 0.0,
+    this.net = 0.0,
+    this.gross = 0.0,
+    this.travelAllowance = 0.0,
+    List<CompensationDocument>? payslips,
+    List<CompensationDocument>? bonusesAndIncentives,
+    List<CompensationDocument>? benefitsSummary,
+    List<CompensationDocument>? compensationLetters,
+    List<CompensationDocument>? offerLetters,
+    List<CompensationDocument>? reimbursements,
+    List<CompensationDocument>? compensationPolicies,
+  })  : payslips = payslips ?? <CompensationDocument>[],
+        bonusesAndIncentives = bonusesAndIncentives ?? <CompensationDocument>[],
+        benefitsSummary = benefitsSummary ?? <CompensationDocument>[],
+        compensationLetters = compensationLetters ?? <CompensationDocument>[],
+        offerLetters = offerLetters ?? <CompensationDocument>[],
+        reimbursements = reimbursements ?? <CompensationDocument>[],
+        compensationPolicies = compensationPolicies ?? <CompensationDocument>[];
 
-  Map<String, double> salaryComponents; // e.g., basic, gross, net, traveling
-  List<String> payslips; // identifiers or URLs
-  List<String> bonuses;
-  List<String> benefits;
-  List<String> documents; // letters/agreements
-  List<String> reimbursements;
-  List<String> policies;
-  List<String> deductions; // dropdown options
-  String selectedDeduction;
+  double basic;
+  double net;
+  double gross;
+  double travelAllowance;
+  List<CompensationDocument> payslips;
+  List<CompensationDocument> bonusesAndIncentives;
+  List<CompensationDocument> benefitsSummary;
+  List<CompensationDocument> compensationLetters;
+  List<CompensationDocument> offerLetters;
+  List<CompensationDocument> reimbursements;
+  List<CompensationDocument> compensationPolicies;
 
   CompensationInfo copy() {
     return CompensationInfo(
-      salaryComponents: Map<String, double>.from(salaryComponents),
-      payslips: List<String>.from(payslips),
-      bonuses: List<String>.from(bonuses),
-      benefits: List<String>.from(benefits),
-      documents: List<String>.from(documents),
-      reimbursements: List<String>.from(reimbursements),
-      policies: List<String>.from(policies),
-      deductions: List<String>.from(deductions),
-      selectedDeduction: selectedDeduction,
+      basic: basic,
+      net: net,
+      gross: gross,
+      travelAllowance: travelAllowance,
+      payslips: payslips.map((d) => d.copy()).toList(),
+      bonusesAndIncentives: bonusesAndIncentives.map((d) => d.copy()).toList(),
+      benefitsSummary: benefitsSummary.map((d) => d.copy()).toList(),
+      compensationLetters: compensationLetters.map((d) => d.copy()).toList(),
+      offerLetters: offerLetters.map((d) => d.copy()).toList(),
+      reimbursements: reimbursements.map((d) => d.copy()).toList(),
+      compensationPolicies: compensationPolicies.map((d) => d.copy()).toList(),
     );
   }
 

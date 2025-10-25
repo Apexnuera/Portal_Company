@@ -6,6 +6,8 @@ import '../utils/image_picker.dart';
 import '../state/employee_directory.dart';
 import '../services/timesheet_service.dart';
 import '../services/faq_service.dart';
+import '../utils/document_picker.dart';
+import '../widgets/compensation_content.dart';
 
 class ProfessionalProfileContent extends StatefulWidget {
   final EmployeeProfessionalProfile initialProfile;
@@ -92,10 +94,13 @@ class _ProfessionalProfileContentState extends State<ProfessionalProfileContent>
 
   Future<void> _pickEducationDocument(_EducationEntryForm form) async {
     if (!_isEditMode) return;
-    // TODO: Implement file picker for non-web platforms
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('File picking not implemented on this platform')),
-    );
+    final file = await pickDocument(context);
+    if (file != null) {
+      setState(() {
+        form.documentName = file.name;
+        form.documentBytes = file.data;
+      });
+    }
   }
 
   void _addEmploymentEntry() {
@@ -114,10 +119,13 @@ class _ProfessionalProfileContentState extends State<ProfessionalProfileContent>
 
   Future<void> _pickEmploymentDocument(_EmploymentEntryForm form) async {
     if (!_isEditMode) return;
-    // TODO: Implement file picker for non-web platforms
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('File picking not implemented on this platform')),
-    );
+    final file = await pickDocument(context);
+    if (file != null) {
+      setState(() {
+        form.documentName = file.name;
+        form.documentBytes = file.data;
+      });
+    }
   }
 
   Future<void> _pickEmploymentDate({
@@ -1285,9 +1293,12 @@ class PersonalDetailsContent extends StatefulWidget {
   const PersonalDetailsContent({
     Key? key,
     required this.employeeId,
+    this.forceReadOnly = false,
+    this.isHrMode = false,
   }) : super(key: key);
-
   final String employeeId;
+  final bool forceReadOnly;
+  final bool isHrMode;
 
   @override
   State<PersonalDetailsContent> createState() => _PersonalDetailsContentState();
@@ -1489,6 +1500,8 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                       foregroundColor: Colors.white,
                     ),
                   )
+                else if (!_isEditMode && widget.forceReadOnly)
+                  const SizedBox()
                 else
                   Row(
                     children: [
@@ -1562,7 +1575,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
               ],
             ),
             const SizedBox(height: 16),
-            if (_isEditMode)
+            if (_isEditMode && !widget.isHrMode)
               Align(
                 alignment: Alignment.centerLeft,
                 child: ElevatedButton.icon(
@@ -1586,7 +1599,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
                 ),
               ),
-            if (_isEditMode) const SizedBox(height: 12),
+            if (_isEditMode && !widget.isHrMode) const SizedBox(height: 12),
             // Asset Details Section
             Container(
               width: double.infinity,
@@ -1601,551 +1614,73 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                 children: [
                   const Text('Asset Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
-                  if (!_isEditMode)
-                    ...[
-                      if (_selectedAssets.isEmpty && _otherAssetsController.text.isEmpty)
-                        const Text('No assets assigned')
-                      else
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (final asset in _selectedAssets)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 2),
-                                child: Text('• $asset'),
-                              ),
-                            if (_otherAssetsController.text.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 2),
-                                child: Text('• ${_otherAssetsController.text}'),
-                              ),
-                          ],
-                        ),
-                    ]
-                  else
-                    ...[
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                  if (!_isEditMode) ...[
+                    if (_selectedAssets.isEmpty && _otherAssetsController.text.isEmpty)
+                      const Text('No assets assigned')
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          for (final asset in ['Laptop', 'Mobile', 'ID Card', 'Access Card'])
-                            FilterChip(
-                              label: Text(asset),
-                              selected: _selectedAssets.contains(asset),
-                              onSelected: (selected) {
-                                setState(() {
-                                  if (selected) {
-                                    _selectedAssets.add(asset);
-                                  } else {
-                                    _selectedAssets.remove(asset);
-                                  }
-                                });
-                              },
+                          for (final asset in _selectedAssets)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Text('• $asset'),
+                            ),
+                          if (_otherAssetsController.text.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Text('• ${_otherAssetsController.text}'),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _otherAssetsController,
-                        decoration: const InputDecoration(
-                          labelText: 'Other Assets',
-                          hintText: 'Enter any other assets',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 2,
-                      ),
-                    ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Compensation Section with Edit/Save functionality
-class CompensationContent extends StatefulWidget {
-  const CompensationContent({Key? key, required this.employeeId}) : super(key: key);
-  final String employeeId;
-
-  @override
-  State<CompensationContent> createState() => _CompensationContentState();
-}
-
-class _CompensationContentState extends State<CompensationContent> {
-  bool _isEditMode = false;
-  late CompensationInfo _workingCopy;
-  final _formKey = GlobalKey<FormState>();
-
-  late TextEditingController _basicController;
-  late TextEditingController _netController;
-  late TextEditingController _grossController;
-  late TextEditingController _travelController;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeControllers();
-  }
-
-  void _initializeControllers() {
-    final directory = context.read<EmployeeDirectory>();
-    final record = directory.getById(widget.employeeId);
-    _workingCopy = record.compensation.copy();
-
-    _basicController = TextEditingController(text: _workingCopy.salaryComponents['basic']?.toString() ?? '0');
-    _netController = TextEditingController(text: _workingCopy.salaryComponents['net']?.toString() ?? '0');
-    _grossController = TextEditingController(text: _workingCopy.salaryComponents['gross']?.toString() ?? '0');
-    _travelController = TextEditingController(text: _workingCopy.salaryComponents['travel']?.toString() ?? '0');
-  }
-
-  @override
-  void dispose() {
-    _basicController.dispose();
-    _netController.dispose();
-    _grossController.dispose();
-    _travelController.dispose();
-    super.dispose();
-  }
-
-  void _toggleEditMode() {
-    setState(() {
-      if (_isEditMode) {
-        _initializeControllers();
-      }
-      _isEditMode = !_isEditMode;
-    });
-  }
-
-  void _saveChanges() {
-    if (_formKey.currentState?.validate() ?? false) {
-      _workingCopy.salaryComponents['basic'] = double.tryParse(_basicController.text) ?? 0;
-      _workingCopy.salaryComponents['net'] = double.tryParse(_netController.text) ?? 0;
-      _workingCopy.salaryComponents['gross'] = double.tryParse(_grossController.text) ?? 0;
-      _workingCopy.salaryComponents['travel'] = double.tryParse(_travelController.text) ?? 0;
-
-      final directory = context.read<EmployeeDirectory>();
-      directory.updateCompensation(widget.employeeId, _workingCopy);
-
-      setState(() => _isEditMode = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Compensation details saved successfully')),
-      );
-    }
-  }
-
-  Widget _buildSalaryField(String label, TextEditingController controller) {
-    if (!_isEditMode) {
-      return Container(
-        width: 220,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 4),
-            Text('₹ ${controller.text}', style: const TextStyle(fontSize: 16)),
-          ],
-        ),
-      );
-    }
-
-    return SizedBox(
-      width: 220,
-      child: TextFormField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixText: '₹ ',
-          border: const OutlineInputBorder(),
-        ),
-        validator: (value) {
-          if (value == null || value.isEmpty) return 'Required';
-          if (double.tryParse(value) == null) return 'Invalid number';
-          return null;
-        },
-      ),
-    );
-  }
-
-  void _addItem(String listType) async {
-    final controller = TextEditingController();
-    final text = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Add $listType'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Description'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-
-    if (text != null && text.isNotEmpty) {
-      setState(() {
-        switch (listType) {
-          case 'Payslip':
-            _workingCopy.payslips.add(text);
-            break;
-          case 'Bonus':
-            _workingCopy.bonuses.add(text);
-            break;
-          case 'Benefit':
-            _workingCopy.benefits.add(text);
-            break;
-          case 'Document':
-            _workingCopy.documents.add(text);
-            break;
-          case 'Reimbursement':
-            _workingCopy.reimbursements.add(text);
-            break;
-          case 'Policy':
-            _workingCopy.policies.add(text);
-            break;
-        }
-      });
-    }
-  }
-
-  Widget _buildEditableList(String title, List<String> items, String itemType) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            if (_isEditMode) ...[
-              const Spacer(),
-              IconButton(
-                onPressed: () => _addItem(itemType),
-                icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFF782B)),
-                tooltip: 'Add $itemType',
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: items.isEmpty
-              ? const Text('No data available')
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: items.map((item) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text('• $item')),
-                          if (_isEditMode)
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                              onPressed: () => setState(() => items.remove(item)),
-                            ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text('Compensation', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                const Spacer(),
-                if (!_isEditMode)
-                  ElevatedButton.icon(
-                    onPressed: _toggleEditMode,
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Edit'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF782B),
-                      foregroundColor: Colors.white,
-                    ),
-                  )
-                else
-                  Row(
-                    children: [
-                      OutlinedButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        onPressed: _saveChanges,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Save'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text('Salary Structure', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 16,
-              runSpacing: 12,
-              children: [
-                _buildSalaryField('Basic', _basicController),
-                _buildSalaryField('Net', _netController),
-                _buildSalaryField('Gross', _grossController),
-                _buildSalaryField('Travel Allowance', _travelController),
-              ],
-            ),
-            _buildEditableList('Payslips', _workingCopy.payslips, 'Payslip'),
-            _buildEditableList('Bonuses & Incentives', _workingCopy.bonuses, 'Bonus'),
-            _buildEditableList('Benefits Summary', _workingCopy.benefits, 'Benefit'),
-            _buildEditableList('Compensation Letters/Agreements', _workingCopy.documents, 'Document'),
-            _buildEditableList('Reimbursements', _workingCopy.reimbursements, 'Reimbursement'),
-            _buildEditableList('Compensation Policies & FAQs', _workingCopy.policies, 'Policy'),
-            if (_isEditMode) ...[
-              const SizedBox(height: 16),
-              const Text('Deductions', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _workingCopy.selectedDeduction.isEmpty ? null : _workingCopy.selectedDeduction,
-                items: const [
-                  DropdownMenuItem(value: 'PF', child: Text('Provident Fund')),
-                  DropdownMenuItem(value: 'ESI', child: Text('ESI')),
-                  DropdownMenuItem(value: 'PT', child: Text('Professional Tax')),
-                  DropdownMenuItem(value: 'TDS', child: Text('TDS')),
-                ],
-                decoration: const InputDecoration(
-                  labelText: 'Deduction Type',
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _workingCopy.selectedDeduction = value ?? '';
-                  });
-                },
-              ),
-            ] else if (_workingCopy.selectedDeduction.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Selected Deduction', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    const SizedBox(height: 4),
-                    Text(_workingCopy.selectedDeduction, style: const TextStyle(fontSize: 16)),
                   ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Tax Information Section with Edit/Save functionality  
-class TaxInformationContent extends StatefulWidget {
-  const TaxInformationContent({Key? key, required this.employeeId}) : super(key: key);
-  final String employeeId;
-
-  @override
-  State<TaxInformationContent> createState() => _TaxInformationContentState();
-}
-
-class _TaxInformationContentState extends State<TaxInformationContent> {
-  bool _isEditMode = false;
-  late TaxInfo _workingCopy;
-  String? _selectedRegime;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeData();
-  }
-
-  void _initializeData() {
-    final directory = context.read<EmployeeDirectory>();
-    final record = directory.getById(widget.employeeId);
-    _workingCopy = record.tax.copy();
-    _selectedRegime = _workingCopy.regime.isEmpty ? null : _workingCopy.regime;
-  }
-
-  void _toggleEditMode() {
-    setState(() {
-      if (_isEditMode) {
-        _initializeData();
-      }
-      _isEditMode = !_isEditMode;
-    });
-  }
-
-  void _saveChanges() {
-    _workingCopy.regime = _selectedRegime ?? '';
-    
-    final directory = context.read<EmployeeDirectory>();
-    directory.updateTax(widget.employeeId, _workingCopy);
-
-    setState(() => _isEditMode = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Tax information saved successfully')),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text('Tax Information', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-              const Spacer(),
-              if (!_isEditMode)
-                ElevatedButton.icon(
-                  onPressed: _toggleEditMode,
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Edit'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF782B),
-                    foregroundColor: Colors.white,
-                  ),
-                )
-              else
-                Row(
-                  children: [
-                    OutlinedButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: _saveChanges,
-                      icon: const Icon(Icons.save),
-                      label: const Text('Save'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+                  if (_isEditMode) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final asset in ['Laptop', 'Mobile', 'ID Card', 'Access Card'])
+                          FilterChip(
+                            label: Text(asset),
+                            selected: _selectedAssets.contains(asset),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _selectedAssets.add(asset);
+                                } else {
+                                  _selectedAssets.remove(asset);
+                                }
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _otherAssetsController,
+                      decoration: const InputDecoration(
+                        labelText: 'Other Assets',
+                        hintText: 'Enter any other assets',
+                        border: OutlineInputBorder(),
                       ),
+                      maxLines: 2,
                     ),
                   ],
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (!_isEditMode)
-            Container(
-              width: 300,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Selected Tax Regime', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 4),
-                  Text(_selectedRegime ?? 'Not selected', style: const TextStyle(fontSize: 16)),
                 ],
-              ),
-            )
-          else
-            SizedBox(
-              width: 300,
-              child: DropdownButtonFormField<String>(
-                value: _selectedRegime,
-                decoration: const InputDecoration(
-                  labelText: 'Tax Regime',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'New', child: Text('New Tax Regime')),
-                  DropdownMenuItem(value: 'Old', child: Text('Old Tax Regime')),
-                ],
-                onChanged: (value) => setState(() => _selectedRegime = value),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ReadOnlyPlaceholder extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-  const _ReadOnlyPlaceholder({required this.icon, required this.title, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 64, color: Colors.grey),
-          const SizedBox(height: 12),
-          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-}
 
 class TimeSheetContent extends StatelessWidget {
   const TimeSheetContent({Key? key, required this.employeeId}) : super(key: key);
   final String employeeId;
-  
+
   @override
   Widget build(BuildContext context) {
     final ts = Provider.of<TimeSheetService>(context);
@@ -2154,8 +1689,6 @@ class TimeSheetContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Time Sheet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 16),
           Row(
             children: [
               ElevatedButton.icon(
@@ -2191,8 +1724,46 @@ class TimeSheetContent extends StatelessWidget {
   }
 }
 
+class TaxInformationContent extends StatelessWidget {
+  const TaxInformationContent({Key? key, required this.employeeId}) : super(key: key);
+  final String employeeId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Text('Tax Information for $employeeId'));
+  }
+}
+
+class _KeyValueTile extends StatelessWidget {
+  final String label;
+  final String value;
+  const _KeyValueTile(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 260,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
+          Text(value.isEmpty ? 'Not set' : value, style: const TextStyle(fontSize: 16)),
+        ],
+      ),
+    );
+  }
+}
+
 class _TimeSheetAttendanceList extends StatelessWidget {
   const _TimeSheetAttendanceList();
+
   @override
   Widget build(BuildContext context) {
     final ts = Provider.of<TimeSheetService>(context);
