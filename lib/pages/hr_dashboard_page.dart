@@ -7,8 +7,150 @@ import '../data/support_store.dart';
 import '../data/application_store.dart';
 import '../state/employee_directory.dart';
 import 'hr_employee_portal_page.dart';
+import '../services/alert_service.dart';
 
-enum _HRMenu { overview, queries, postJob, postInternship, employeeDetails }
+enum _HRMenu { overview, queries, alerts, postJob, postInternship, employeeDetails }
+
+class _AlertsModule extends StatefulWidget {
+  const _AlertsModule();
+  @override
+  State<_AlertsModule> createState() => _AlertsModuleState();
+}
+
+class _AlertsModuleState extends State<_AlertsModule> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final alertService = context.watch<AlertService>();
+    final alerts = alertService.alerts;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Alerts', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87)),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Emergency Alert Message',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black87),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _controller,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Enter alert message to broadcast to all employees...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        context.read<AlertService>().add(_controller.text);
+                        _controller.clear();
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert added')));
+                      },
+                      icon: const Icon(Icons.add_alert_outlined),
+                      label: const Text('Add Alert'),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: alerts.isEmpty
+                          ? null
+                          : () {
+                              context.read<AlertService>().clearAll();
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All alerts cleared')));
+                            },
+                      icon: const Icon(Icons.delete_sweep_outlined),
+                      label: const Text('Clear All'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.list_alt_outlined, color: Color(0xFFFF782B)),
+                    SizedBox(width: 8),
+                    Text('Alerts List', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (alerts.isEmpty)
+                  Text('No alerts', style: TextStyle(color: Colors.grey.shade700))
+                else
+                  ...alerts.map((a) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text(a.text)),
+                            Switch(
+                              value: a.active,
+                              activeColor: const Color(0xFFFF782B),
+                              onChanged: (v) => context.read<AlertService>().toggleActive(a.id, v),
+                            ),
+                            IconButton(
+                              tooltip: 'Delete',
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => context.read<AlertService>().remove(a.id),
+                            ),
+                          ],
+                        ),
+                      )),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _EmployeeDetailsData extends ChangeNotifier {
   final List<_EmployeeRecord> _employees = [];
@@ -1932,6 +2074,7 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final hasActive = context.watch<AlertService>().hasActive;
     return ChangeNotifierProvider<EmployeeDirectory>.value(
       value: EmployeeDirectory(),
       child: Scaffold(
@@ -1939,6 +2082,27 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
           title: const Text('HR Dashboard'),
           backgroundColor: const Color(0xFFFF782B),
           foregroundColor: Colors.white,
+          actions: [
+            TextButton.icon(
+              onPressed: () => setState(() => _selected = _HRMenu.alerts),
+              icon: Icon(Icons.campaign_outlined, color: hasActive ? Colors.redAccent : Colors.white),
+              label: Text(
+                'Alerts',
+                style: TextStyle(color: hasActive ? Colors.redAccent : Colors.white, fontWeight: FontWeight.w600),
+              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+            ),
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('mail id : hr@apexnuera.com')));
+              },
+              icon: const Icon(Icons.support_agent, color: Colors.white),
+              label: const Text('Contact', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+            ),
+            const SizedBox(width: 8),
+          ],
         ),
         body: LayoutBuilder(
           builder: (context, constraints) {
@@ -1978,6 +2142,7 @@ class _Sidebar extends StatelessWidget {
   const _Sidebar({required this.selected, required this.onSelect});
   @override
   Widget build(BuildContext context) {
+    final hasActive = context.watch<AlertService>().hasActive;
     return Container(
       width: 240,
       color: Colors.grey.shade50,
@@ -1995,6 +2160,12 @@ class _Sidebar extends StatelessWidget {
             title: const Text('Help and Support'),
             selected: selected == _HRMenu.queries,
             onTap: () => onSelect(_HRMenu.queries),
+          ),
+          ListTile(
+            leading: Icon(Icons.campaign_outlined, color: hasActive ? Colors.red : const Color(0xFFFF782B)),
+            title: Text('Alerts', style: TextStyle(color: hasActive ? Colors.red : null)),
+            selected: selected == _HRMenu.alerts,
+            onTap: () => onSelect(_HRMenu.alerts),
           ),
           const Divider(),
           ListTile(
@@ -2027,6 +2198,7 @@ class _TopNav extends StatelessWidget {
   const _TopNav({required this.selected, required this.onSelect});
   @override
   Widget build(BuildContext context) {
+    final hasActive = context.watch<AlertService>().hasActive;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       height: 56,
@@ -2042,6 +2214,20 @@ class _TopNav extends StatelessWidget {
             onPressed: () => onSelect(_HRMenu.queries),
             icon: const Icon(Icons.help_outline, color: Color(0xFFFF782B)),
             label: const Text('Help and Support'),
+          ),
+          TextButton.icon(
+            onPressed: () => onSelect(_HRMenu.alerts),
+            icon: Icon(Icons.campaign_outlined, color: hasActive ? Colors.red : const Color(0xFFFF782B)),
+            label: Text('Alerts', style: TextStyle(color: hasActive ? Colors.red : null)),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: () {
+              // Contact at top: open mailto
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('mail id : hr@apexnuera.com')));
+            },
+            icon: const Icon(Icons.support_agent, color: Color(0xFFFF782B)),
+            label: const Text('Contact'),
           ),
           const Spacer(),
           TextButton.icon(
@@ -2077,6 +2263,9 @@ class _RightPanel extends StatelessWidget {
         break;
       case _HRMenu.queries:
         child = const _QueriesList();
+        break;
+      case _HRMenu.alerts:
+        child = const _AlertsModule();
         break;
       case _HRMenu.postJob:
         child = const _JobsModule();

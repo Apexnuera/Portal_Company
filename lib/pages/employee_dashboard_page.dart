@@ -8,6 +8,7 @@ import '../widgets/timesheet_content.dart';
 import '../utils/document_picker.dart';
 import '../widgets/compensation_content.dart';
 import 'dart:html' as html;
+import '../services/alert_service.dart';
 
 class ProfessionalProfileContent extends StatefulWidget {
   final EmployeeProfessionalProfile initialProfile;
@@ -1126,6 +1127,9 @@ class _EmployeeTopHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const orange = Color(0xFFFF782B);
+    final hasActiveAlerts = context.watch<AlertService>().hasActive;
+    final GlobalKey alertsKey = GlobalKey();
+    final GlobalKey contactKey = GlobalKey();
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -1134,7 +1138,7 @@ class _EmployeeTopHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(color: orange, borderRadius: BorderRadius.circular(6)),
-            child: const Text('ApexNuera', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            child: const Text('apexnuera', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1156,8 +1160,94 @@ class _EmployeeTopHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          IconButton(tooltip: 'Alerts', onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No new alerts'))), icon: const Icon(Icons.notifications_none)),
-          TextButton.icon(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact support: support@company.com'))), icon: const Icon(Icons.support_agent), label: const Text('Contact')),
+          // Alerts button with red-dot badge and top popup menu
+          Container(
+            key: alertsKey,
+            child: IconButton(
+              tooltip: 'Alerts',
+              onPressed: () async {
+                final svc = context.read<AlertService>();
+                final active = svc.activeAlerts;
+                final RenderBox button = alertsKey.currentContext!.findRenderObject() as RenderBox;
+                final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+                final position = RelativeRect.fromRect(
+                  button.localToGlobal(Offset.zero, ancestor: overlay) & button.size,
+                  Offset.zero & overlay.size,
+                );
+                await showMenu<String>(
+                  context: context,
+                  position: position,
+                  items: (active.isEmpty
+                          ? [const PopupMenuItem<String>(enabled: false, child: Text('No new alerts', style: TextStyle(color: Colors.red)))]
+                          : active
+                              .map((a) => const PopupMenuItem<String>(
+                                    enabled: false,
+                                    child: DefaultTextStyle(
+                                      style: TextStyle(color: Colors.red),
+                                      child: Text(''),
+                                    ),
+                                  ))
+                              .toList())
+                      .asMap()
+                      .entries
+                      .map((entry) {
+                        if (active.isEmpty) return entry.value;
+                        final idx = entry.key;
+                        return PopupMenuItem<String>(
+                          enabled: false,
+                          child: Text(active[idx].text, style: const TextStyle(color: Colors.red)),
+                        );
+                      }).toList(),
+                );
+                // Mark all alerts as seen after the user has viewed the menu
+                svc.markAllSeen();
+              },
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(Icons.notifications_none, color: hasActiveAlerts ? Colors.red : Colors.black87),
+                  if (hasActiveAlerts)
+                    const Positioned(
+                      right: -1,
+                      top: -1,
+                      child: SizedBox(
+                        width: 8,
+                        height: 8,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // Contact button with top popup menu
+          Container(
+            key: contactKey,
+            child: TextButton.icon(
+              onPressed: () async {
+                final RenderBox button = contactKey.currentContext!.findRenderObject() as RenderBox;
+                final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+                final position = RelativeRect.fromRect(
+                  button.localToGlobal(Offset.zero, ancestor: overlay) & button.size,
+                  Offset.zero & overlay.size,
+                );
+                await showMenu<String>(
+                  context: context,
+                  position: position,
+                  items: const [
+                    PopupMenuItem<String>(
+                      enabled: false,
+                      child: Text('mail id : hr@apexnuera.com', style: TextStyle(color: Color(0xFFFF782B))),
+                    ),
+                  ],
+                );
+              },
+              icon: const Icon(Icons.support_agent),
+              label: const Text('Contact'),
+            ),
+          ),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: () {
@@ -1176,12 +1266,14 @@ class _EmployeeTopHeader extends StatelessWidget {
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text((record?.personal.fullName.isNotEmpty == true ? record!.personal.fullName : 'John Doe'),
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-            Text(employeeId, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            Text((record?.professional.employeeId.isNotEmpty == true
+                    ? record!.professional.employeeId
+                    : (employeeId != EmployeeDirectory.fallbackEmployeeId ? employeeId : '')),
+                style: const TextStyle(fontSize: 11, color: Colors.grey)),
           ]),
           const SizedBox(width: 12),
           TextButton.icon(
             onPressed: () {
-              // Clear auth state and navigate to login
               Navigator.of(context).pushReplacementNamed('/login/employee');
             },
             icon: const Icon(Icons.logout, size: 18),
@@ -1324,6 +1416,11 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
   late TextEditingController _otherAssetsController;
   DateTime? _dateOfBirth;
   Set<String> _selectedAssets = {};
+  // Bank details controllers
+  late TextEditingController _bankHolderController;
+  late TextEditingController _bankNumberController;
+  late TextEditingController _bankIfscController;
+  late TextEditingController _bankNameController;
 
   @override
   void initState() {
@@ -1350,6 +1447,10 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
     _otherAssetsController = TextEditingController(text: _workingCopy.otherAssets);
     _dateOfBirth = _workingCopy.dateOfBirth;
     _selectedAssets = Set<String>.from(_workingCopy.assignedAssets);
+    _bankHolderController = TextEditingController(text: _workingCopy.bankAccountHolderName);
+    _bankNumberController = TextEditingController(text: _workingCopy.bankAccountNumber);
+    _bankIfscController = TextEditingController(text: _workingCopy.bankIfscCode);
+    _bankNameController = TextEditingController(text: _workingCopy.bankName);
   }
 
   @override
@@ -1366,6 +1467,10 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
     _aadharIdController.dispose();
     _bloodGroupController.dispose();
     _otherAssetsController.dispose();
+    _bankHolderController.dispose();
+    _bankNumberController.dispose();
+    _bankIfscController.dispose();
+    _bankNameController.dispose();
     super.dispose();
   }
 
@@ -1396,6 +1501,27 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
       _workingCopy.dateOfBirth = _dateOfBirth;
       _workingCopy.assignedAssets = _selectedAssets;
       _workingCopy.otherAssets = _otherAssetsController.text;
+
+      // Persist bank details only if not locked (employee can submit once)
+      if (!widget.isHrMode && !_workingCopy.bankDetailsLocked) {
+        _workingCopy.bankAccountHolderName = _bankHolderController.text;
+        _workingCopy.bankAccountNumber = _bankNumberController.text;
+        _workingCopy.bankIfscCode = _bankIfscController.text;
+        _workingCopy.bankName = _bankNameController.text;
+        if (_bankHolderController.text.isNotEmpty ||
+            _bankNumberController.text.isNotEmpty ||
+            _bankIfscController.text.isNotEmpty ||
+            _bankNameController.text.isNotEmpty) {
+          _workingCopy.bankDetailsLocked = true; // lock after first submit
+        }
+      }
+      if (widget.isHrMode) {
+        // HR can always edit bank details and lock/unlock
+        _workingCopy.bankAccountHolderName = _bankHolderController.text;
+        _workingCopy.bankAccountNumber = _bankNumberController.text;
+        _workingCopy.bankIfscCode = _bankIfscController.text;
+        _workingCopy.bankName = _bankNameController.text;
+      }
 
       // Save to directory
       final directory = context.read<EmployeeDirectory>();
@@ -1469,6 +1595,26 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
           filled: true,
           fillColor: enabled ? Colors.white : Colors.grey.shade100,
         ),
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyKeyValue(String label, String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 4),
+          Text(value.isEmpty ? 'Not set' : value, style: const TextStyle(fontSize: 16)),
+        ],
       ),
     );
   }
@@ -1610,6 +1756,92 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                 ),
               ),
             if (_isEditMode && !widget.isHrMode) const SizedBox(height: 12),
+            // Bank Details Section (shown above Asset Details)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('Bank Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 12),
+                      if (_workingCopy.bankDetailsLocked && !widget.isHrMode)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            border: Border.all(color: const Color(0xFFFF782B)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text('Locked after submission', style: TextStyle(fontSize: 11, color: Color(0xFFFF782B))),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (widget.isHrMode || (!_workingCopy.bankDetailsLocked && _isEditMode))
+                    Column(
+                      children: [
+                        Row(children: [
+                          Expanded(child: _buildField('Account Holder Name', _bankHolderController)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildField('Account Number', _bankNumberController, keyboardType: TextInputType.number)),
+                        ]),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(child: _buildField('IFSC Code', _bankIfscController)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildField('Bank Name', _bankNameController)),
+                        ]),
+                        if (widget.isHrMode) ...[
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            const Text('Lock after submission'),
+                            const SizedBox(width: 8),
+                            Switch(
+                              value: _workingCopy.bankDetailsLocked,
+                              onChanged: (v) {
+                                setState(() {
+                                  _workingCopy.bankDetailsLocked = v;
+                                });
+                              },
+                            ),
+                          ]),
+                        ],
+                      ],
+                    )
+                  else
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildReadOnlyKeyValue('Account Holder Name', _workingCopy.bankAccountHolderName),
+                        const SizedBox(height: 8),
+                        _buildReadOnlyKeyValue('Account Number', _workingCopy.bankAccountNumber),
+                        const SizedBox(height: 8),
+                        _buildReadOnlyKeyValue('IFSC Code', _workingCopy.bankIfscCode),
+                        const SizedBox(height: 8),
+                        _buildReadOnlyKeyValue('Bank Name', _workingCopy.bankName),
+                        const SizedBox(height: 12),
+                        TextButton.icon(
+                          onPressed: () {
+                            context.read<AlertService>().add('Bank details change requested by ${_workingCopy.fullName} (${widget.employeeId})');
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Request sent to HR.')));
+                          },
+                          icon: const Icon(Icons.request_page_outlined),
+                          label: const Text('Request Change'),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             // Asset Details Section
             Container(
               width: double.infinity,

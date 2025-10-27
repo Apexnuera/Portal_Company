@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/employee_directory.dart';
@@ -16,6 +17,54 @@ class CompensationContent extends StatefulWidget {
 class _CompensationContentState extends State<CompensationContent> {
   int? _selectedYear;
   int? _selectedMonth;
+
+  String _guessMime(String name) {
+    final ext = name.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'bmp':
+        return 'image/bmp';
+      case 'webp':
+        return 'image/webp';
+      case 'txt':
+        return 'text/plain';
+      case 'rtf':
+        return 'application/rtf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  void _openDocument(CompensationDocument doc) {
+    final blob = html.Blob(<Uint8List>[doc.data], _guessMime(doc.name));
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.window.open(url, '_blank');
+    html.Url.revokeObjectUrl(url);
+  }
+
+  void _downloadDocument(CompensationDocument doc) {
+    final blob = html.Blob(<Uint8List>[doc.data], _guessMime(doc.name));
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..download = doc.name
+      ..style.display = 'none';
+    html.document.body?.append(anchor);
+    anchor.click();
+    anchor.remove();
+    html.Url.revokeObjectUrl(url);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +90,7 @@ class _CompensationContentState extends State<CompensationContent> {
           const SizedBox(height: 24),
           _buildSalaryDetails(context, compensation),
           const SizedBox(height: 24),
-          if (!widget.isHrMode) _buildPayslipFilter(uniqueYears),
+          _buildPayslipFilter(uniqueYears),
           _buildDocumentSection('Payslips', compensation.payslips, filteredPayslips),
           _buildDocumentSection('Bonuses and Incentives', compensation.bonusesAndIncentives),
           _buildDocumentSection('Benefits Summary', compensation.benefitsSummary),
@@ -176,16 +225,23 @@ class _CompensationContentState extends State<CompensationContent> {
           const Text('No documents available.')
         else
           ...itemsToShow.map((doc) => Card(
-                child: ListTile(
-                  leading: const Icon(Icons.description_outlined),
-                  title: Text(doc.name),
-                  subtitle: Text('Uploaded on: ${doc.date.day}/${doc.date.month}/${doc.date.year}'),
-                  trailing: widget.isHrMode
-                      ? IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => context.read<EmployeeDirectory>().removeCompensationDocument(widget.employeeId, title, doc),
-                        )
-                      : null,
+                child: InkWell(
+                  onDoubleTap: () => _openDocument(doc),
+                  child: ListTile(
+                    leading: const Icon(Icons.description_outlined),
+                    title: Text(doc.name),
+                    subtitle: Text('Uploaded on: ${doc.date.day}/${doc.date.month}/${doc.date.year}'),
+                    trailing: widget.isHrMode
+                        ? IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            onPressed: () => context.read<EmployeeDirectory>().removeCompensationDocument(widget.employeeId, title, doc),
+                          )
+                        : IconButton(
+                            tooltip: 'Download',
+                            icon: const Icon(Icons.download_outlined),
+                            onPressed: () => _downloadDocument(doc),
+                          ),
+                  ),
                 ),
               )),
       ],

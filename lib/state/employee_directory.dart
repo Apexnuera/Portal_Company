@@ -21,6 +21,11 @@ class EmployeePersonalDetails {
     Set<String>? assignedAssets,
     this.otherAssets = '',
     this.profileImageBytes,
+    this.bankAccountHolderName = '',
+    this.bankAccountNumber = '',
+    this.bankIfscCode = '',
+    this.bankName = '',
+    this.bankDetailsLocked = false,
   }) : assignedAssets = assignedAssets ?? <String>{};
 
   String fullName;
@@ -38,6 +43,11 @@ class EmployeePersonalDetails {
   Set<String> assignedAssets;
   String otherAssets;
   Uint8List? profileImageBytes;
+  String bankAccountHolderName;
+  String bankAccountNumber;
+  String bankIfscCode;
+  String bankName;
+  bool bankDetailsLocked;
 
   EmployeePersonalDetails copy() {
     return EmployeePersonalDetails(
@@ -60,6 +70,11 @@ class EmployeePersonalDetails {
       profileImageBytes: profileImageBytes != null
           ? Uint8List.fromList(profileImageBytes!)
           : null,
+      bankAccountHolderName: bankAccountHolderName,
+      bankAccountNumber: bankAccountNumber,
+      bankIfscCode: bankIfscCode,
+      bankName: bankName,
+      bankDetailsLocked: bankDetailsLocked,
     );
   }
 }
@@ -400,6 +415,11 @@ class EmployeeDirectory extends ChangeNotifier {
       assignedAssets: <String>{},
       otherAssets: '',
       profileImageBytes: null,
+      bankAccountHolderName: '',
+      bankAccountNumber: '',
+      bankIfscCode: '',
+      bankName: '',
+      bankDetailsLocked: false,
     );
 
     final professional = EmployeeProfessionalProfile(
