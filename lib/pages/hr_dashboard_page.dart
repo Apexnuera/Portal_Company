@@ -2587,8 +2587,12 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final hasActive = context.watch<AlertService>().hasActive;
-    return ChangeNotifierProvider<EmployeeDirectory>.value(
-      value: EmployeeDirectory(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<EmployeeDirectory>(create: (_) => EmployeeDirectory()),
+        ChangeNotifierProvider<PostStore>.value(value: PostStore.I),
+        ChangeNotifierProvider<ApplicationStore>.value(value: ApplicationStore.I),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('HR Dashboard'),
@@ -2856,17 +2860,379 @@ class _InfoCard extends StatelessWidget {
 class _WelcomePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Welcome Header
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF782B), Color(0xFFFF9B5B)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'HR Dashboard Overview',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Welcome back! Here\'s a summary of your HR operations.',
+                    style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.9)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Key Metrics Row
+          _MetricsRow(),
+          const SizedBox(height: 16),
+          
+          // Recent Activities and Quick Actions
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth >= 800) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _RecentActivities()),
+                    const SizedBox(width: 16),
+                    Expanded(child: _QuickActions()),
+                  ],
+                );
+              }
+              return Column(
+                children: [
+                  _RecentActivities(),
+                  const SizedBox(height: 16),
+                  _QuickActions(),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricsRow extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final directory = context.watch<EmployeeDirectory>();
+    final employeeCount = directory.employees
+        .where((e) => e.id != EmployeeDirectory.fallbackEmployeeId)
+        .length;
+    final jobCount = context.watch<PostStore>().jobs.length;
+    final internshipCount = context.watch<PostStore>().internships.length;
+    final activeAlerts = context.watch<AlertService>().activeAlerts.length;
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 800) {
+          return Row(
+            children: [
+              Expanded(child: _MetricCard(icon: Icons.people_outline, title: 'Total Employees', value: '$employeeCount', color: const Color(0xFF4CAF50))),
+              const SizedBox(width: 12),
+              Expanded(child: _MetricCard(icon: Icons.work_outline, title: 'Active Jobs', value: '$jobCount', color: const Color(0xFF2196F3))),
+              const SizedBox(width: 12),
+              Expanded(child: _MetricCard(icon: Icons.school_outlined, title: 'Internships', value: '$internshipCount', color: const Color(0xFF9C27B0))),
+              const SizedBox(width: 12),
+              Expanded(child: _MetricCard(icon: Icons.campaign_outlined, title: 'Active Alerts', value: '$activeAlerts', color: const Color(0xFFFF5722))),
+            ],
+          );
+        }
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(child: _MetricCard(icon: Icons.people_outline, title: 'Total Employees', value: '$employeeCount', color: const Color(0xFF4CAF50))),
+                const SizedBox(width: 12),
+                Expanded(child: _MetricCard(icon: Icons.work_outline, title: 'Active Jobs', value: '$jobCount', color: const Color(0xFF2196F3))),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _MetricCard(icon: Icons.school_outlined, title: 'Internships', value: '$internshipCount', color: const Color(0xFF9C27B0))),
+                const SizedBox(width: 12),
+                Expanded(child: _MetricCard(icon: Icons.campaign_outlined, title: 'Active Alerts', value: '$activeAlerts', color: const Color(0xFFFF5722))),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+  
+  const _MetricCard({required this.icon, required this.title, required this.value, required this.color});
+  
+  @override
+  Widget build(BuildContext context) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Welcome to the HR Dashboard', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-            SizedBox(height: 8),
-            Text('Select an option from the left to get started.'),
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const Spacer(),
+                Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontSize: 13, color: Colors.black54)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentActivities extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final jobApps = context.watch<ApplicationStore>().jobApplications;
+    final internApps = context.watch<ApplicationStore>().internshipApplications;
+    final alerts = context.watch<AlertService>().alerts;
+    
+    final activities = <Map<String, dynamic>>[];
+    
+    // Add job applications
+    for (final app in jobApps.take(3)) {
+      activities.add({
+        'icon': Icons.work_outline,
+        'title': 'New Job Application',
+        'subtitle': app.email,
+        'time': _formatTime(app.createdAt),
+        'color': const Color(0xFF2196F3),
+      });
+    }
+    
+    // Add internship applications
+    for (final app in internApps.take(2)) {
+      activities.add({
+        'icon': Icons.school_outlined,
+        'title': 'New Internship Application',
+        'subtitle': app.email,
+        'time': _formatTime(app.createdAt),
+        'color': const Color(0xFF9C27B0),
+      });
+    }
+    
+    // Add recent alerts
+    for (final alert in alerts.take(2)) {
+      activities.add({
+        'icon': Icons.campaign_outlined,
+        'title': 'Alert Posted',
+        'subtitle': alert.text.length > 40 ? '${alert.text.substring(0, 40)}...' : alert.text,
+        'time': _formatTime(alert.createdAt),
+        'color': const Color(0xFFFF5722),
+      });
+    }
+    
+    // Sort by time (most recent first)
+    activities.sort((a, b) => b['time'].toString().compareTo(a['time'].toString()));
+    
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.history, color: Color(0xFFFF782B)),
+                SizedBox(width: 8),
+                Text('Recent Activities', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (activities.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade300),
+                      const SizedBox(height: 8),
+                      Text('No recent activities', style: TextStyle(color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ...activities.take(5).map((activity) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: (activity['color'] as Color).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(activity['icon'] as IconData, color: activity['color'] as Color, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(activity['title'] as String, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Text(activity['subtitle'] as String, style: const TextStyle(fontSize: 12, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                    Text(activity['time'] as String, style: const TextStyle(fontSize: 11, color: Colors.black38)),
+                  ],
+                ),
+              )),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  String _formatTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.bolt_outlined, color: Color(0xFFFF782B)),
+                SizedBox(width: 8),
+                Text('Quick Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _QuickActionButton(
+              icon: Icons.work_outline,
+              label: 'Post New Job',
+              onTap: () {
+                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
+                state?.setState(() => state._selected = _HRMenu.postJob);
+              },
+            ),
+            const SizedBox(height: 8),
+            _QuickActionButton(
+              icon: Icons.school_outlined,
+              label: 'Post Internship',
+              onTap: () {
+                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
+                state?.setState(() => state._selected = _HRMenu.postInternship);
+              },
+            ),
+            const SizedBox(height: 8),
+            _QuickActionButton(
+              icon: Icons.campaign_outlined,
+              label: 'Create Alert',
+              onTap: () {
+                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
+                state?.setState(() => state._selected = _HRMenu.alerts);
+              },
+            ),
+            const SizedBox(height: 8),
+            _QuickActionButton(
+              icon: Icons.people_outline,
+              label: 'View Employees',
+              onTap: () {
+                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
+                state?.setState(() => state._selected = _HRMenu.employeeDetails);
+              },
+            ),
+            const SizedBox(height: 8),
+            _QuickActionButton(
+              icon: Icons.folder_open,
+              label: 'Company Drive',
+              onTap: () {
+                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
+                state?.setState(() => state._selected = _HRMenu.companyDrive);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  
+  const _QuickActionButton({required this.icon, required this.label, required this.onTap});
+  
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFFFF782B), size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black38),
           ],
         ),
       ),
