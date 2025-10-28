@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,8 +10,475 @@ import '../data/application_store.dart';
 import '../state/employee_directory.dart';
 import 'hr_employee_portal_page.dart';
 import '../services/alert_service.dart';
+import '../utils/document_picker_web.dart';
 
-enum _HRMenu { overview, queries, alerts, postJob, postInternship, employeeDetails }
+enum _HRMenu { overview, queries, alerts, postJob, postInternship, employeeDetails, companyDrive }
+
+// ========================= COMPANY DRIVE =========================
+class _DriveEntry {
+  String id;
+  String name;
+  bool isFolder;
+  DateTime createdAt;
+  _DriveEntry? parent;
+  List<_DriveEntry> children; // for folders
+  Uint8List? data; // for files
+  String? mimeType; // for files
+
+  _DriveEntry.folder({required this.name, this.parent})
+      : id = UniqueKey().toString(),
+        isFolder = true,
+        createdAt = DateTime.now(),
+        children = <_DriveEntry>[],
+        data = null,
+        mimeType = null;
+
+  _DriveEntry.file({required this.name, required this.data, required this.mimeType, this.parent})
+      : id = UniqueKey().toString(),
+        isFolder = false,
+        createdAt = DateTime.now(),
+        children = <_DriveEntry>[];
+}
+
+class _CompanyDriveState extends ChangeNotifier {
+  final _DriveEntry root = _DriveEntry.folder(name: 'My Drive');
+  final List<_DriveEntry> _path = [];
+  String _query = '';
+
+  _CompanyDriveState() {
+    _path.add(root);
+  }
+
+  List<_DriveEntry> get path => List.unmodifiable(_path);
+  _DriveEntry get current => _path.last;
+  String get query => _query;
+
+  void setQuery(String q) {
+    _query = q.trim();
+    notifyListeners();
+  }
+
+  void cd(_DriveEntry folder) {
+    if (!folder.isFolder) return;
+    _path.add(folder);
+    notifyListeners();
+  }
+
+  void upTo(int index) {
+    if (index < 0 || index >= _path.length) return;
+    _path.removeRange(index + 1, _path.length);
+    notifyListeners();
+  }
+
+  void createFolder(String name) {
+    if (name.trim().isEmpty) return;
+    final entry = _DriveEntry.folder(name: name.trim(), parent: current);
+    current.children.add(entry);
+    notifyListeners();
+  }
+
+  void uploadFile({required String name, required Uint8List data, String? mimeType}) {
+    final entry = _DriveEntry.file(name: name, data: data, mimeType: mimeType ?? 'application/octet-stream', parent: current);
+    current.children.add(entry);
+    notifyListeners();
+  }
+
+  void rename(_DriveEntry entry, String newName) {
+    if (newName.trim().isEmpty) return;
+    entry.name = newName.trim();
+    notifyListeners();
+  }
+
+  void delete(_DriveEntry entry) {
+    final parent = entry.parent;
+    if (parent == null) return;
+    parent.children.remove(entry);
+    notifyListeners();
+  }
+
+  List<_DriveEntry> listVisible() {
+    if (_query.isEmpty) return List<_DriveEntry>.from(current.children);
+    final List<_DriveEntry> all = [];
+    void dfs(_DriveEntry e) {
+      if (!e.isFolder) {
+        if (e.name.toLowerCase().contains(_query.toLowerCase())) all.add(e);
+      } else {
+        if (e.name.toLowerCase().contains(_query.toLowerCase())) all.add(e);
+        for (final c in e.children) dfs(c);
+      }
+    }
+    dfs(root);
+    return all;
+  }
+}
+
+class _CompanyDriveModule extends StatefulWidget {
+  const _CompanyDriveModule();
+  @override
+  State<_CompanyDriveModule> createState() => _CompanyDriveModuleState();
+}
+
+class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
+  late final _CompanyDriveState _state;
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _state = _CompanyDriveState();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  IconData _iconFor(_DriveEntry e) {
+    if (e.isFolder) return Icons.folder;
+    final ext = e.name.split('.').last.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext)) return Icons.image_outlined;
+    if (['pdf'].contains(ext)) return Icons.picture_as_pdf_outlined;
+    if (['doc', 'docx', 'rtf'].contains(ext)) return Icons.description_outlined;
+    if (['txt', 'md'].contains(ext)) return Icons.article_outlined;
+    return Icons.insert_drive_file_outlined;
+  }
+
+  Future<void> _onUpload() async {
+    final doc = await pickDocument(context);
+    if (doc != null) {
+      _state.uploadFile(name: doc.name, data: doc.data, mimeType: doc.type);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Uploaded ${doc.name}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _onNewFolder() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Folder'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Folder name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      _state.createFolder(name);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Folder "$name" created')));
+    }
+  }
+
+  Future<void> _rename(_DriveEntry entry) async {
+    final controller = TextEditingController(text: entry.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'New name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      _state.rename(entry, name);
+    }
+  }
+
+  Future<void> _delete(_DriveEntry entry) async {
+    final isFolder = entry.isFolder;
+    final childCount = isFolder ? entry.children.length : 0;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete'),
+        content: Text(
+          'Are you sure you want to delete "${entry.name}"${isFolder ? ' and its $childCount item(s)?' : '?'}',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) _state.delete(entry);
+  }
+
+  void _download(_DriveEntry entry) {
+    if (entry.isFolder || entry.data == null) return;
+    final blob = html.Blob([entry.data!], entry.mimeType ?? 'application/octet-stream');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)..download = entry.name;
+    anchor.click();
+    html.Url.revokeObjectUrl(url);
+  }
+
+  void _openFile(_DriveEntry entry) {
+    if (entry.isFolder || entry.data == null) return;
+    final blob = html.Blob([entry.data!], entry.mimeType ?? 'application/octet-stream');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.window.open(url, '_blank');
+    Future.delayed(const Duration(seconds: 3), () => html.Url.revokeObjectUrl(url));
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    int i = 0;
+    double size = bytes.toDouble();
+    while (size >= 1024 && i < units.length - 1) {
+      size /= 1024;
+      i++;
+    }
+    final precision = (i > 0 && size < 10) ? 1 : 0;
+    return '${size.toStringAsFixed(precision)} ${units[i]}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _state,
+      builder: (context, _) {
+        final items = _state.listVisible();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.cloud_outlined, color: Color(0xFFFF782B)),
+                      const SizedBox(width: 8),
+                      const Text('Company Drive', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const Spacer(),
+                      SizedBox(
+                        width: 300,
+                        child: TextField(
+                          controller: _search,
+                          onChanged: _state.setQuery,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            prefixIcon: const Icon(Icons.search),
+                            hintText: 'Search files and folders',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: _onNewFolder,
+                        icon: const Icon(Icons.create_new_folder_outlined),
+                        label: const Text('New Folder'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: _onUpload,
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('Upload'),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Breadcrumbs
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (int i = 0; i < _state.path.length; i++) ...[
+                          InkWell(
+                            onTap: () => _state.upTo(i),
+                            child: Row(
+                              children: [
+                                if (i == 0) const Icon(Icons.home_outlined, size: 18, color: Color(0xFFFF782B)),
+                                if (i == 0) const SizedBox(width: 4),
+                                Text(_state.path[i].name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                          if (i != _state.path.length - 1) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right, size: 18),
+                            const SizedBox(width: 8),
+                          ],
+                        ]
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Content list
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: items.isEmpty
+                  ? SizedBox(
+                      height: 160,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.folder_open, size: 48, color: Colors.grey.shade300),
+                            const SizedBox(height: 6),
+                            Text(_state.query.isEmpty ? 'This folder is empty' : 'No results found', style: TextStyle(color: Colors.grey.shade600)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        // Header row
+                        Container(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                          ),
+                          child: Row(
+                            children: const [
+                              Expanded(flex: 6, child: Text('Name', style: TextStyle(fontWeight: FontWeight.w700))),
+                              Expanded(flex: 2, child: Text('Owner')),
+                              Expanded(flex: 3, child: Text('Date modified')),
+                              Expanded(flex: 2, child: Text('File size')),
+                              SizedBox(width: 40),
+                            ],
+                          ),
+                        ),
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade300),
+                          itemBuilder: (context, index) {
+                            final e = items[index];
+                            final isFolder = e.isFolder;
+                            final sizeText = isFolder ? '—' : _formatSize(e.data?.length ?? 0);
+                            final date = e.createdAt;
+                            final dateText = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                            return InkWell(
+                              onDoubleTap: () {
+                                if (isFolder) {
+                                  _state.cd(e);
+                                } else {
+                                  _openFile(e);
+                                }
+                              },
+                              child: Container(
+                                height: 48,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Row(
+                                  children: [
+                                    // Name
+                                    Expanded(
+                                      flex: 6,
+                                      child: Row(
+                                        children: [
+                                          Icon(_iconFor(e), color: isFolder ? Colors.grey.shade700 : const Color(0xFFFF782B)),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Owner
+                                    const Expanded(flex: 2, child: Text('me')),
+                                    // Date modified
+                                    Expanded(flex: 3, child: Text(dateText)),
+                                    // File size
+                                    Expanded(flex: 2, child: Text(sizeText)),
+                                    // Menu
+                                    PopupMenuButton<String>(
+                                      tooltip: 'More',
+                                      icon: const Icon(Icons.more_vert),
+                                      onSelected: (v) {
+                                        switch (v) {
+                                          case 'open':
+                                            if (isFolder) {
+                                              _state.cd(e);
+                                            } else {
+                                              _openFile(e);
+                                            }
+                                            break;
+                                          case 'download':
+                                            if (!isFolder) _download(e);
+                                            break;
+                                          case 'rename':
+                                            _rename(e);
+                                            break;
+                                          case 'delete':
+                                            _delete(e);
+                                            break;
+                                        }
+                                      },
+                                      itemBuilder: (ctx) => [
+                                        if (isFolder)
+                                          const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.folder_open), title: Text('Open'))),
+                                        if (!isFolder)
+                                          const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.open_in_new), title: Text('Open'))),
+                                        if (!isFolder)
+                                          const PopupMenuItem(value: 'download', child: ListTile(leading: Icon(Icons.download_outlined), title: Text('Download'))),
+                                        const PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.drive_file_rename_outline), title: Text('Rename'))),
+                                        const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline, color: Colors.red), title: Text('Delete'))),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
 
 class _AlertsModule extends StatefulWidget {
   const _AlertsModule();
@@ -74,7 +543,9 @@ class _AlertsModuleState extends State<_AlertsModule> {
                       onPressed: () {
                         context.read<AlertService>().add(_controller.text);
                         _controller.clear();
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert added')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Alert added')),
+                        );
                       },
                       icon: const Icon(Icons.add_alert_outlined),
                       label: const Text('Add Alert'),
@@ -353,21 +824,8 @@ class _EmployeeDetailsModule extends StatefulWidget {
   State<_EmployeeDetailsModule> createState() => _EmployeeDetailsModuleState();
 }
 
-class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
   final _EmployeeDetailsData _data = _EmployeeDetailsData();
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -384,134 +842,146 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> with Sin
                 border: Border.all(color: Colors.grey.shade300),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                       border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
                     ),
-                    child: TabBar(
-                      controller: _tabController,
-                      labelColor: const Color(0xFFFF782B),
-                      unselectedLabelColor: Colors.black54,
-                      indicator: BoxDecoration(
-                        color: const Color(0xFFFF782B).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.5)),
-                      ),
-                      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                      tabs: const [
-                        Tab(text: 'Create New Employee'),
-                        Tab(text: 'Employee List'),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Employee List',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            await showDialog<void>(
+                              context: context,
+                              builder: (dialogCtx) {
+                                return Dialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(maxWidth: 720),
+                                    child: _CreateEmployeeForm(
+                                      onCreate: (record) {
+                                        _data.addEmployee(record);
+                                        final globalRecord = EmployeeRecord(
+                                          id: record.id,
+                                          name: record.name,
+                                          primaryEmail: record.email,
+                                          personal: EmployeePersonalDetails(
+                                            fullName: record.name,
+                                            familyName: '',
+                                            corporateEmail: record.email,
+                                            personalEmail: '',
+                                            mobileNumber: '',
+                                            alternateMobileNumber: '',
+                                            currentAddress: '',
+                                            permanentAddress: '',
+                                            panId: '',
+                                            aadharId: '',
+                                            dateOfBirth: null,
+                                            bloodGroup: '',
+                                            otherAssets: '',
+                                            profileImageBytes: null,
+                                            assignedAssets: <String>{},
+                                          ),
+                                          professional: EmployeeProfessionalProfile(
+                                            position: '',
+                                            employeeId: record.id,
+                                            department: '',
+                                            managerName: '',
+                                            employmentType: '',
+                                            location: '',
+                                            workSpace: '',
+                                            jobLevel: '',
+                                            startDate: null,
+                                            confirmationDate: null,
+                                            skills: '',
+                                          ),
+                                        );
+                                        context.read<EmployeeDirectory>().addEmployee(globalRecord);
+                                        Navigator.of(dialogCtx).pop();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Employee "${record.name}" created successfully.')),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                          icon: const Icon(Icons.person_add_alt_1_outlined),
+                          label: const Text('Create Employee'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF782B),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   SizedBox(
                     height: 540,
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _CreateEmployeeForm(
-                          onCreate: (record) {
-                            _data.addEmployee(record);
-                            // Add to global EmployeeDirectory
-                            final globalRecord = EmployeeRecord(
-                              id: record.id,
-                              name: record.name,
-                              primaryEmail: record.email,
-                              personal: EmployeePersonalDetails(
-                                fullName: record.name,
-                                familyName: '',
-                                corporateEmail: record.email,
-                                personalEmail: '',
-                                mobileNumber: '',
-                                alternateMobileNumber: '',
-                                currentAddress: '',
-                                permanentAddress: '',
-                                panId: '',
-                                aadharId: '',
-                                dateOfBirth: null,
-                                bloodGroup: '',
-                                otherAssets: '',
-                                profileImageBytes: null,
-                                assignedAssets: <String>{},
-                              ),
-                              professional: EmployeeProfessionalProfile(
-                                position: '',
-                                employeeId: record.id,
-                                department: '',
-                                managerName: '',
-                                employmentType: '',
-                                location: '',
-                                workSpace: '',
-                                jobLevel: '',
-                                startDate: null,
-                                confirmationDate: null,
-                                skills: '',
-                              ),
-                            );
-                            context.read<EmployeeDirectory>().addEmployee(globalRecord);
-                            _tabController.animateTo(1);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Employee "${record.name}" created successfully.')),
-                            );
-                          },
-                        ),
-                        _EmployeeListView(
-                          employees: _data.employees,
-                          onView: (record) {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => ChangeNotifierProvider<EmployeeDirectory>.value(
-                                  value: context.read<EmployeeDirectory>()..setPrimaryEmployee(record.id),
-                                  child: HREmployeePortalPage(employeeId: record.id),
-                                ),
-                              ),
-                            );
-                          },
-                          onEdit: (record) async {
-                            final updatedRecord = await showDialog<_EmployeeRecord>(
-                              context: context,
-                              builder: (context) => _EditEmployeeDialog(employee: record),
-                            );
+                    child: _EmployeeListView(
+                      employees: _data.employees,
+                      onView: (record) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ChangeNotifierProvider<EmployeeDirectory>.value(
+                              value: context.read<EmployeeDirectory>()..setPrimaryEmployee(record.id),
+                              child: HREmployeePortalPage(employeeId: record.id),
+                            ),
+                          ),
+                        );
+                      },
+                      onEdit: (record) async {
+                        final updatedRecord = await showDialog<_EmployeeRecord>(
+                          context: context,
+                          builder: (context) => _EditEmployeeDialog(employee: record),
+                        );
 
-                            if (updatedRecord != null) {
-                              _data.updateEmployee(record, updatedRecord);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Employee "${updatedRecord.name}" updated.')),
-                              );
-                            }
-                          },
-                          onDelete: (record) async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Delete Employee'),
-                                content: Text('Are you sure you want to delete ${record.name}?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.of(context).pop(false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () => Navigator.of(context).pop(true),
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
+                        if (updatedRecord != null) {
+                          _data.updateEmployee(record, updatedRecord);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Employee "${updatedRecord.name}" updated.')),
+                          );
+                        }
+                      },
+                      onDelete: (record) async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Employee'),
+                            content: Text('Are you sure you want to delete ${record.name}?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
                               ),
-                            );
+                              ElevatedButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
 
-                            if (confirmed == true) {
-                              _data.removeEmployee(record);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Employee "${record.name}" deleted.')),
-                              );
-                            }
-                          },
-                        ),
-                      ],
+                        if (confirmed == true) {
+                          _data.removeEmployee(record);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Employee "${record.name}" deleted.')),
+                          );
+                        }
+                      },
+                      showTitle: false,
                     ),
                   ),
                 ],
@@ -683,21 +1153,45 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
   }
 }
 
-class _EmployeeListView extends StatelessWidget {
+class _EmployeeListView extends StatefulWidget {
   final List<_EmployeeRecord> employees;
   final ValueChanged<_EmployeeRecord> onView;
   final ValueChanged<_EmployeeRecord> onEdit;
   final ValueChanged<_EmployeeRecord> onDelete;
+  final bool showTitle;
   const _EmployeeListView({
     required this.employees,
     required this.onView,
     required this.onEdit,
     required this.onDelete,
+    this.showTitle = true,
+    super.key,
   });
 
   @override
+  State<_EmployeeListView> createState() => _EmployeeListViewState();
+}
+
+class _EmployeeListViewState extends State<_EmployeeListView> {
+  static const int _pageSize = 10;
+  int _page = 0;
+
+  int get _totalPages => (widget.employees.length / _pageSize).ceil();
+
+  @override
+  void didUpdateWidget(covariant _EmployeeListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final maxPageIndex = (_totalPages == 0) ? 0 : _totalPages - 1;
+    if (_page > maxPageIndex) {
+      setState(() {
+        _page = maxPageIndex;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (employees.isEmpty) {
+    if (widget.employees.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -713,6 +1207,12 @@ class _EmployeeListView extends StatelessWidget {
       );
     }
 
+    final maxPageIndex = (_totalPages == 0) ? 0 : _totalPages - 1;
+    final currentPage = _page.clamp(0, maxPageIndex);
+    final start = currentPage * _pageSize;
+    final endExclusive = (start + _pageSize) > widget.employees.length ? widget.employees.length : (start + _pageSize);
+    final visible = widget.employees.sublist(start, endExclusive);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -720,11 +1220,13 @@ class _EmployeeListView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Employee List',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
-              ),
-              const SizedBox(height: 16),
+              if (widget.showTitle) ...[
+                const Text(
+                  'Employee List',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+                ),
+                const SizedBox(height: 16),
+              ],
               Container(
                 width: constraints.maxWidth,
                 decoration: BoxDecoration(
@@ -756,7 +1258,7 @@ class _EmployeeListView extends StatelessWidget {
                         DataColumn(label: Text('Employee Email')),
                         DataColumn(label: Text('Actions')),
                       ],
-                      rows: employees.map((employee) {
+                      rows: visible.map((employee) {
                         return DataRow(
                           cells: [
                             DataCell(Text(employee.id)),
@@ -767,19 +1269,19 @@ class _EmployeeListView extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    onPressed: () => onView(employee),
+                                    onPressed: () => widget.onView(employee),
                                     icon: const Icon(Icons.visibility_outlined),
                                     tooltip: 'View Details',
                                   ),
                                   const SizedBox(width: 4),
                                   IconButton(
-                                    onPressed: () => onEdit(employee),
+                                    onPressed: () => widget.onEdit(employee),
                                     icon: const Icon(Icons.edit_outlined),
                                     tooltip: 'Edit Employee',
                                   ),
                                   const SizedBox(width: 4),
                                   IconButton(
-                                    onPressed: () => onDelete(employee),
+                                    onPressed: () => widget.onDelete(employee),
                                     icon: const Icon(Icons.delete_outline),
                                     color: Colors.red,
                                     tooltip: 'Delete Employee',
@@ -793,6 +1295,41 @@ class _EmployeeListView extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    'Showing ${start + 1}-${endExclusive} of ${widget.employees.length}',
+                    style: TextStyle(color: Colors.grey.shade700),
+                  ),
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    onPressed: currentPage > 0
+                        ? () {
+                            setState(() {
+                              _page = currentPage - 1;
+                            });
+                          }
+                        : null,
+                    icon: const Icon(Icons.chevron_left),
+                    label: const Text('Previous'),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('Page ${currentPage + 1} of ${_totalPages}'),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: currentPage < maxPageIndex
+                        ? () {
+                            setState(() {
+                              _page = currentPage + 1;
+                            });
+                          }
+                        : null,
+                    icon: const Icon(Icons.chevron_right),
+                    label: const Text('Next'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1158,12 +1695,6 @@ class _JobsModuleState extends State<_JobsModule> {
 
   @override
   Widget build(BuildContext context) {
-    final allItems = ApplicationStore.I.jobApplications;
-    final totalPages = (allItems.length / _itemsPerPage).ceil();
-    if (_currentPage >= totalPages && totalPages > 0) {
-      _currentPage = totalPages - 1;
-    }
-
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -1223,10 +1754,10 @@ class _JobsModuleState extends State<_JobsModule> {
               ),
             ),
           ),
-          totalPages > 1
+          _currentPage > 0 || ApplicationStore.I.jobApplications.length > _itemsPerPage
               ? _PaginationControls(
                   currentPage: _currentPage,
-                  totalPages: totalPages,
+                  totalPages: (ApplicationStore.I.jobApplications.length / _itemsPerPage).ceil(),
                   onPageChanged: (page) {
                     setState(() => _currentPage = page);
                   },
@@ -1297,12 +1828,6 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
 
   @override
   Widget build(BuildContext context) {
-    final allItems = ApplicationStore.I.internshipApplications;
-    final totalPages = (allItems.length / _itemsPerPage).ceil();
-    if (_currentPage >= totalPages && totalPages > 0) {
-      _currentPage = totalPages - 1;
-    }
-
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -1362,10 +1887,10 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
               ),
             ),
           ),
-          totalPages > 1
+          _currentPage > 0 || ApplicationStore.I.internshipApplications.length > _itemsPerPage
               ? _PaginationControls(
                   currentPage: _currentPage,
-                  totalPages: totalPages,
+                  totalPages: (ApplicationStore.I.internshipApplications.length / _itemsPerPage).ceil(),
                   onPageChanged: (page) {
                     setState(() => _currentPage = page);
                   },
@@ -1408,7 +1933,6 @@ class _ApplicationListHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          
           // 2. Resume Header
           Expanded(
             flex: 2,
@@ -1428,7 +1952,6 @@ class _ApplicationListHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          
           // 3. Applied On Header
           Row(
             children: [
@@ -1445,7 +1968,6 @@ class _ApplicationListHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 16),
-          
           // 4. Status Header
           SizedBox(
             width: 130,
@@ -1460,7 +1982,6 @@ class _ApplicationListHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          
           // 5. Download Header
           SizedBox(
             width: 110,
@@ -1475,7 +1996,6 @@ class _ApplicationListHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          
           // 6. Delete Header
           SizedBox(
             width: 40,
@@ -1548,7 +2068,7 @@ class _JobApplicationsList extends StatelessWidget {
                 separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final app = items[index];
-                  final dateStr = '${app.createdAt.year.toString().padLeft(4, '0')}-${app.createdAt.month.toString().padLeft(2, '0')}-${app.createdAt.day.toString().padLeft(2, '0')}';
+                  final dateStr = '${app.createdAt.year.toString().padLeft(4,'0')}-${app.createdAt.month.toString().padLeft(2,'0')}-${app.createdAt.day.toString().padLeft(2,'0')}';
 
                   return _ApplicationCard(
                     email: app.email,
@@ -1624,7 +2144,7 @@ class _InternshipApplicationsList extends StatelessWidget {
                 separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final app = items[index];
-                  final dateStr = '${app.createdAt.year.toString().padLeft(4, '0')}-${app.createdAt.month.toString().padLeft(2, '0')}-${app.createdAt.day.toString().padLeft(2, '0')}';
+                  final dateStr = '${app.createdAt.year.toString().padLeft(4,'0')}-${app.createdAt.month.toString().padLeft(2,'0')}-${app.createdAt.day.toString().padLeft(2,'0')}';
 
                   return _ApplicationCard(
                     email: app.email,
@@ -1705,7 +2225,6 @@ class _ApplicationCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            
             // 2. Resume File Name
             Expanded(
               flex: 2,
@@ -1728,7 +2247,6 @@ class _ApplicationCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            
             // 3. Applied On Date
             Row(
               children: [
@@ -1745,14 +2263,12 @@ class _ApplicationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 16),
-            
             // 4. Status Dropdown
             _StatusChipDropdown(
               currentStatus: status,
               onStatusChanged: onStatusChanged,
             ),
             const SizedBox(width: 16),
-            
             // 5. Download Button
             ElevatedButton.icon(
               onPressed: onDownload,
@@ -1769,7 +2285,6 @@ class _ApplicationCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            
             // 6. Delete Button
             IconButton(
               onPressed: onDelete,
@@ -1850,7 +2365,7 @@ class _StatusChipDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     Color statusColor;
     IconData statusIcon;
-    
+    // TODO: Add more status options
     switch (currentStatus) {
       case 'Selected':
         statusColor = const Color(0xFF4CAF50);
@@ -1963,7 +2478,6 @@ class _PaginationControls extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          
           // Page numbers
           ...List.generate(totalPages, (index) {
             // Show first page, last page, current page, and pages around current
@@ -1986,9 +2500,8 @@ class _PaginationControls extends StatelessWidget {
             }
             return const SizedBox.shrink();
           }),
-          
-          const SizedBox(width: 16),
           // Next button
+          const SizedBox(width: 16),
           IconButton(
             onPressed: currentPage < totalPages - 1 ? () => onPageChanged(currentPage + 1) : null,
             icon: const Icon(Icons.chevron_right),
@@ -1999,9 +2512,8 @@ class _PaginationControls extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-          
-          const SizedBox(width: 16),
           // Page info
+          const SizedBox(width: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -2109,6 +2621,7 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
             final isWide = constraints.maxWidth >= 900;
             if (isWide) {
               return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _Sidebar(
                     selected: _selected,
@@ -2186,6 +2699,12 @@ class _Sidebar extends StatelessWidget {
             selected: selected == _HRMenu.employeeDetails,
             onTap: () => onSelect(_HRMenu.employeeDetails),
           ),
+          ListTile(
+            leading: const Icon(Icons.folder_open, color: Color(0xFFFF782B)),
+            title: const Text('Company Drive'),
+            selected: selected == _HRMenu.companyDrive,
+            onTap: () => onSelect(_HRMenu.companyDrive),
+          ),
         ],
       ),
     );
@@ -2245,6 +2764,11 @@ class _TopNav extends StatelessWidget {
             icon: const Icon(Icons.people_outline, color: Color(0xFFFF782B)),
             label: const Text('Employee Details'),
           ),
+          TextButton.icon(
+            onPressed: () => onSelect(_HRMenu.companyDrive),
+            icon: const Icon(Icons.folder_open, color: Color(0xFFFF782B)),
+            label: const Text('Company Drive'),
+          ),
         ],
       ),
     );
@@ -2276,11 +2800,15 @@ class _RightPanel extends StatelessWidget {
       case _HRMenu.employeeDetails:
         child = const _EmployeeDetailsModule();
         break;
+      case _HRMenu.companyDrive:
+        child = const _CompanyDriveModule();
+        break;
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Center(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: child,
