@@ -4,6 +4,7 @@ import 'widgets/app_header_clean.dart';
 import 'services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'state/app_session.dart';
+import 'utils/validators.dart';
 
 class EmployeeLoginPage extends StatefulWidget {
   const EmployeeLoginPage({super.key});
@@ -74,17 +75,15 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                           TextFormField(
                             controller: _emailController,
                             decoration: InputDecoration(
-                              labelText: 'Email or Employee ID',
-                              prefixIcon: const Icon(Icons.person_outline, color: Color(0xFFFF782B)),
+                              labelText: 'Email Address',
+                              prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFFFF782B)),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                               ),
                             ),
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Please enter Email or Employee ID'
-                                : null,
+                            validator: Validators.validateEmail,
                           ),
                           const SizedBox(height: 12),
                           TextFormField(

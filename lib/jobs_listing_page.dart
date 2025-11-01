@@ -3,8 +3,22 @@ import 'widgets/app_header_clean.dart';
 import 'package:go_router/go_router.dart';
 import 'data/post_store.dart';
 
-class JobsListingPage extends StatelessWidget {
+class JobsListingPage extends StatefulWidget {
   const JobsListingPage({super.key});
+
+  @override
+  State<JobsListingPage> createState() => _JobsListingPageState();
+}
+
+class _JobsListingPageState extends State<JobsListingPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,6 +26,39 @@ class JobsListingPage extends StatelessWidget {
       body: Column(
         children: [
           const AppHeader(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search jobs by title, location, or description...',
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFFF782B)),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
+                ),
+              ),
+            ),
+          ),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -26,7 +73,16 @@ class JobsListingPage extends StatelessWidget {
                 return AnimatedBuilder(
                   animation: PostStore.I,
                   builder: (context, _) {
-                    final items = PostStore.I.jobs;
+                    var items = PostStore.I.jobs;
+                    
+                    // Filter items based on search query
+                    if (_searchQuery.isNotEmpty) {
+                      items = items.where((job) {
+                        return job.title.toLowerCase().contains(_searchQuery) ||
+                               job.location.toLowerCase().contains(_searchQuery) ||
+                               job.description.toLowerCase().contains(_searchQuery);
+                      }).toList();
+                    }
                     return Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: GridView.builder(
@@ -39,13 +95,19 @@ class JobsListingPage extends StatelessWidget {
                         itemCount: items.isEmpty ? 1 : items.length,
                         itemBuilder: (context, index) {
                           if (items.isEmpty) {
-                            // Single placeholder card as a visual template
-                            return const _JobCard(
-                              title: 'Software Engineer (Template)',
-                              date: '—',
-                              description: 'Use this card style for new job posts.',
-                              location: '—',
-                              jobId: 'JOB-TEMPLATE',
+                            // Show message when no results
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.work_off_outlined, size: 64, color: Colors.grey.shade400),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _searchQuery.isEmpty ? 'No jobs available' : 'No jobs found matching "$_searchQuery"',
+                                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
                             );
                           }
                           final j = items[index];

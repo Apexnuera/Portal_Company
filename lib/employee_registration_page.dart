@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'widgets/app_header_clean.dart';
+import 'utils/validators.dart';
 
 class EmployeeRegistrationPage extends StatefulWidget {
   const EmployeeRegistrationPage({super.key});
@@ -90,9 +92,7 @@ class _EmployeeRegistrationPageState extends State<EmployeeRegistrationPage> {
                                       borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) => (v == null || v.trim().isEmpty)
-                                      ? 'Please enter your full name'
-                                      : null,
+                                  validator: (v) => Validators.validateName(v, fieldName: 'Full Name'),
                                 ),
                                 const SizedBox(height: 6),
                                 TextFormField(
@@ -110,12 +110,7 @@ class _EmployeeRegistrationPageState extends State<EmployeeRegistrationPage> {
                                       borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) return 'Please enter email';
-                                    final emailRegex = RegExp(r'^.+@.+\..+$');
-                                    if (!emailRegex.hasMatch(v.trim())) return 'Please enter a valid email';
-                                    return null;
-                                  },
+                                  validator: Validators.validateEmail,
                                 ),
                                 const SizedBox(height: 6),
                                 TextFormField(
@@ -123,6 +118,7 @@ class _EmployeeRegistrationPageState extends State<EmployeeRegistrationPage> {
                                   keyboardType: TextInputType.number,
                                   textInputAction: TextInputAction.next,
                                   maxLength: 10,
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                   decoration: InputDecoration(
                                     counterText: '',
                                     labelText: 'Mobile Number (10 digits)',
@@ -135,22 +131,17 @@ class _EmployeeRegistrationPageState extends State<EmployeeRegistrationPage> {
                                       borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) {
-                                    final value = v?.trim() ?? '';
-                                    if (value.isEmpty) return 'Please enter mobile number';
-                                    if (!RegExp(r'^\d{10}$').hasMatch(value)) {
-                                      return 'Enter a valid 10-digit mobile number';
-                                    }
-                                    return null;
-                                  },
+                                  validator: Validators.validateMobileNumber,
                                 ),
                                 const SizedBox(height: 6),
                                 TextFormField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
+                                  maxLength: 10,
                                   decoration: InputDecoration(
-                                    labelText: 'Password',
+                                    labelText: 'Password (10 chars: Capital, lowercase, numbers, symbols)',
                                     isDense: true,
+                                    counterText: '',
                                     contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                                     prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFFFF782B)),
                                     suffixIcon: IconButton(
@@ -172,17 +163,17 @@ class _EmployeeRegistrationPageState extends State<EmployeeRegistrationPage> {
                                       borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) => (v == null || v.isEmpty)
-                                      ? 'Please enter password'
-                                      : (v.length < 6 ? 'Password must be at least 6 characters' : null),
+                                  validator: Validators.validatePassword,
                                 ),
                                 const SizedBox(height: 6),
                                 TextFormField(
                                   controller: _confirmPasswordController,
                                   obscureText: _obscureConfirmPassword,
+                                  maxLength: 10,
                                   decoration: InputDecoration(
                                     labelText: 'Confirm Password',
                                     isDense: true,
+                                    counterText: '',
                                     contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                                     prefixIcon: const Icon(Icons.lock_person_outlined, color: Color(0xFFFF782B)),
                                     suffixIcon: IconButton(
@@ -204,11 +195,7 @@ class _EmployeeRegistrationPageState extends State<EmployeeRegistrationPage> {
                                       borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) return 'Please confirm password';
-                                    if (v != _passwordController.text) return 'Passwords do not match';
-                                    return null;
-                                  },
+                                  validator: (v) => Validators.validateConfirmPassword(v, _passwordController.text),
                                 ),
                                 const SizedBox(height: 10),
                                 SizedBox(

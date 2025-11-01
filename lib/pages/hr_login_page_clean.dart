@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../widgets/app_header_clean.dart';
+import '../utils/validators.dart';
 
 class HRLoginPage extends StatefulWidget {
   const HRLoginPage({super.key});
@@ -69,15 +70,15 @@ class _HRLoginPageState extends State<HRLoginPage> {
                                 TextFormField(
                                   controller: _emailController,
                                   decoration: InputDecoration(
-                                    labelText: 'Email or HR ID',
-                                    prefixIcon: const Icon(Icons.person_outline, color: Color(0xFFFF782B)),
+                                    labelText: 'Email Address',
+                                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFFFF782B)),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
                                       borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter Email or HR ID' : null,
+                                  validator: Validators.validateEmail,
                                 ),
                                 const SizedBox(height: 12),
                                 TextFormField(

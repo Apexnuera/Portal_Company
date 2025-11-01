@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import '../services/timesheet_service.dart';
@@ -9,6 +10,7 @@ import '../utils/document_picker.dart';
 import '../widgets/compensation_content.dart';
 import 'dart:html' as html;
 import '../services/alert_service.dart';
+import '../utils/validators.dart';
 
 class ProfessionalProfileContent extends StatefulWidget {
   final EmployeeProfessionalProfile initialProfile;
@@ -1414,6 +1416,12 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
   late TextEditingController _aadharIdController;
   late TextEditingController _bloodGroupController;
   late TextEditingController _otherAssetsController;
+  late TextEditingController _projectNameController;
+  late TextEditingController _projectDurationController;
+  late TextEditingController _projectManagerController;
+  late FocusNode _projectNameFocusNode;
+  late FocusNode _projectDurationFocusNode;
+  late FocusNode _projectManagerFocusNode;
   DateTime? _dateOfBirth;
   Set<String> _selectedAssets = {};
   // Bank details controllers
@@ -1425,6 +1433,9 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
   @override
   void initState() {
     super.initState();
+    _projectNameFocusNode = FocusNode();
+    _projectDurationFocusNode = FocusNode();
+    _projectManagerFocusNode = FocusNode();
     _initializeControllers();
   }
 
@@ -1445,6 +1456,9 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
     _aadharIdController = TextEditingController(text: _workingCopy.aadharId);
     _bloodGroupController = TextEditingController(text: _workingCopy.bloodGroup);
     _otherAssetsController = TextEditingController(text: _workingCopy.otherAssets);
+    _projectNameController = TextEditingController(text: _workingCopy.currentProjectName);
+    _projectDurationController = TextEditingController(text: _workingCopy.currentProjectDuration);
+    _projectManagerController = TextEditingController(text: _workingCopy.currentProjectManager);
     _dateOfBirth = _workingCopy.dateOfBirth;
     _selectedAssets = Set<String>.from(_workingCopy.assignedAssets);
     _bankHolderController = TextEditingController(text: _workingCopy.bankAccountHolderName);
@@ -1467,6 +1481,12 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
     _aadharIdController.dispose();
     _bloodGroupController.dispose();
     _otherAssetsController.dispose();
+    _projectNameController.dispose();
+    _projectDurationController.dispose();
+    _projectManagerController.dispose();
+    _projectNameFocusNode.dispose();
+    _projectDurationFocusNode.dispose();
+    _projectManagerFocusNode.dispose();
     _bankHolderController.dispose();
     _bankNumberController.dispose();
     _bankIfscController.dispose();
@@ -1481,6 +1501,21 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
         _initializeControllers();
       }
       _isEditMode = !_isEditMode;
+    });
+  }
+
+  void _handleProjectAllocationChangeTap() {
+    if (_isEditMode) {
+      FocusScope.of(context).requestFocus(_projectNameFocusNode);
+      return;
+    }
+    if (widget.forceReadOnly) {
+      return;
+    }
+    _toggleEditMode();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      FocusScope.of(context).requestFocus(_projectNameFocusNode);
     });
   }
 
@@ -1501,6 +1536,28 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
       _workingCopy.dateOfBirth = _dateOfBirth;
       _workingCopy.assignedAssets = _selectedAssets;
       _workingCopy.otherAssets = _otherAssetsController.text;
+
+      // Project Allocation: if current project changes, push previous into history
+      final prevProjectName = _workingCopy.currentProjectName;
+      final prevProjectDuration = _workingCopy.currentProjectDuration;
+      final prevProjectManager = _workingCopy.currentProjectManager;
+      final newProjectName = _projectNameController.text.trim();
+      final newProjectDuration = _projectDurationController.text.trim();
+      final newProjectManager = _projectManagerController.text.trim();
+      final changed =
+          prevProjectName != newProjectName ||
+          prevProjectDuration != newProjectDuration ||
+          prevProjectManager != newProjectManager;
+      if (changed && (prevProjectName.isNotEmpty || prevProjectDuration.isNotEmpty || prevProjectManager.isNotEmpty)) {
+        _workingCopy.projectHistory.insert(0, ProjectAllocationEntry(
+          projectName: prevProjectName,
+          duration: prevProjectDuration,
+          reportingManager: prevProjectManager,
+        ));
+      }
+      _workingCopy.currentProjectName = newProjectName;
+      _workingCopy.currentProjectDuration = newProjectDuration;
+      _workingCopy.currentProjectManager = newProjectManager;
 
       // Persist bank details only if not locked (employee can submit once)
       if (!widget.isHrMode && !_workingCopy.bankDetailsLocked) {
@@ -1540,11 +1597,19 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _dateOfBirth ?? DateTime.now(),
+      initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 18)),
       firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      lastDate: DateTime.now().subtract(const Duration(days: 1)), // Cannot select today
     );
     if (picked != null && picked != _dateOfBirth) {
+      // Validate age > 18
+      final validationError = Validators.validateDateOfBirth(picked);
+      if (validationError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(validationError)),
+        );
+        return;
+      }
       setState(() {
         _dateOfBirth = picked;
       });
@@ -1561,6 +1626,9 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
     bool enabled = true,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    FocusNode? focusNode,
   }) {
     if (!_isEditMode) {
       return Container(
@@ -1587,13 +1655,17 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
       child: TextFormField(
         controller: controller,
         enabled: enabled,
+        focusNode: focusNode,
         keyboardType: keyboardType,
         validator: validator,
+        inputFormatters: inputFormatters,
+        maxLength: maxLength,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
           filled: true,
           fillColor: enabled ? Colors.white : Colors.grey.shade100,
+          counterText: maxLength != null ? '' : null,
         ),
       ),
     );
@@ -1674,12 +1746,44 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
               spacing: 16,
               runSpacing: 16,
               children: [
-                _buildField('Full Name', _fullNameController),
-                _buildField('Father/Mother/Spouse Name', _familyNameController),
-                _buildField('Employee Email', _corporateEmailController),
-                _buildField('Personal Email', _personalEmailController),
-                _buildField('Contact Number', _mobileNumberController),
-                _buildField('Alternate Number', _alternateMobileController),
+                _buildField(
+                  'Full Name',
+                  _fullNameController,
+                  validator: (v) => Validators.validateName(v, fieldName: 'Full Name'),
+                ),
+                _buildField(
+                  'Father/Mother/Spouse Name',
+                  _familyNameController,
+                  validator: (v) => Validators.validateName(v, fieldName: 'Father/Mother/Spouse Name'),
+                ),
+                _buildField(
+                  'Employee Email',
+                  _corporateEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: Validators.validateEmail,
+                ),
+                _buildField(
+                  'Personal Email',
+                  _personalEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: Validators.validateEmail,
+                ),
+                _buildField(
+                  'Contact Number',
+                  _mobileNumberController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 10,
+                  validator: Validators.validateMobileNumber,
+                ),
+                _buildField(
+                  'Alternate Number',
+                  _alternateMobileController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 10,
+                  validator: Validators.validateMobileNumber,
+                ),
                 if (!_isEditMode)
                   Container(
                     width: 300,
@@ -1716,8 +1820,19 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                 _buildField('Blood Group', _bloodGroupController),
                 _buildField('Current Address', _currentAddressController, width: 400),
                 _buildField('Permanent Address', _permanentAddressController, width: 400),
-                _buildField('PAN', _panIdController),
-                _buildField('Aadhaar', _aadharIdController),
+                _buildField(
+                  'PAN',
+                  _panIdController,
+                  validator: Validators.validatePAN,
+                ),
+                _buildField(
+                  'Aadhaar',
+                  _aadharIdController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 12,
+                  validator: Validators.validateAadhaar,
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -1838,6 +1953,128 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                         ),
                       ],
                     ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Project Allocation Section (between Bank Details and Asset Details)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final changeButton = TextButton(
+                        onPressed: widget.forceReadOnly ? null : _handleProjectAllocationChangeTap,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          foregroundColor: const Color(0xFFFF782B),
+                        ),
+                        child: const Text('Change'),
+                      );
+
+                      if (constraints.maxWidth < 520) {
+                        return Row(
+                          children: [
+                            const Text('Project Allocation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            const SizedBox(width: 8),
+                            if (!widget.forceReadOnly) changeButton,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          const Text('Project Allocation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          const Spacer(),
+                          if (!widget.forceReadOnly) changeButton,
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  if (_isEditMode) ...[
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _buildField('Name of the Project', _projectNameController, width: 320, focusNode: _projectNameFocusNode),
+                        _buildField('Duration', _projectDurationController, width: 200, focusNode: _projectDurationFocusNode),
+                        _buildField('Reporting Manager', _projectManagerController, width: 320, focusNode: _projectManagerFocusNode),
+                      ],
+                    ),
+                  ] else ...[
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _buildReadOnlyKeyValue('Name of the Project', _workingCopy.currentProjectName),
+                        _buildReadOnlyKeyValue('Duration', _workingCopy.currentProjectDuration),
+                        _buildReadOnlyKeyValue('Reporting Manager', _workingCopy.currentProjectManager),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  if (_workingCopy.projectHistory.isNotEmpty) ...[
+                    const Text('Project Allocation History', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isNarrow = constraints.maxWidth < 600;
+                        if (isNarrow) {
+                          return Column(
+                            children: [
+                              for (final entry in _workingCopy.projectHistory)
+                                Container(
+                                  width: double.infinity,
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Project Name: ${entry.projectName}'),
+                                      const SizedBox(height: 4),
+                                      Text('Duration: ${entry.duration}'),
+                                      const SizedBox(height: 4),
+                                      Text('Reporting Manager: ${entry.reportingManager}'),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          );
+                        }
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columns: const [
+                              DataColumn(label: Text('Project Name')),
+                              DataColumn(label: Text('Duration')),
+                              DataColumn(label: Text('Reporting Manager')),
+                            ],
+                            rows: _workingCopy.projectHistory.map((e) => DataRow(cells: [
+                                  DataCell(Text(e.projectName)),
+                                  DataCell(Text(e.duration)),
+                                  DataCell(Text(e.reportingManager)),
+                                ])).toList(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),

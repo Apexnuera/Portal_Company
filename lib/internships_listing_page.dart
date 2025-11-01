@@ -3,8 +3,22 @@ import 'widgets/app_header_clean.dart';
 import 'package:go_router/go_router.dart';
 import 'data/post_store.dart';
 
-class InternshipsListingPage extends StatelessWidget {
+class InternshipsListingPage extends StatefulWidget {
   const InternshipsListingPage({super.key});
+
+  @override
+  State<InternshipsListingPage> createState() => _InternshipsListingPageState();
+}
+
+class _InternshipsListingPageState extends State<InternshipsListingPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,6 +26,39 @@ class InternshipsListingPage extends StatelessWidget {
       body: Column(
         children: [
           const AppHeader(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search internships by title or description...',
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFFF782B)),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
+                ),
+              ),
+            ),
+          ),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -25,7 +72,15 @@ class InternshipsListingPage extends StatelessWidget {
                 return AnimatedBuilder(
                   animation: PostStore.I,
                   builder: (context, _) {
-                    final items = PostStore.I.internships;
+                    var items = PostStore.I.internships;
+                    
+                    // Filter items based on search query
+                    if (_searchQuery.isNotEmpty) {
+                      items = items.where((internship) {
+                        return internship.title.toLowerCase().contains(_searchQuery) ||
+                               internship.description.toLowerCase().contains(_searchQuery);
+                      }).toList();
+                    }
                     return Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: GridView.builder(
@@ -38,12 +93,19 @@ class InternshipsListingPage extends StatelessWidget {
                         itemCount: items.isEmpty ? 1 : items.length,
                         itemBuilder: (context, index) {
                           if (items.isEmpty) {
-                            // Single placeholder card as a visual template
-                            return const _InternshipCard(
-                              title: 'Software Intern (Template)',
-                              date: '—',
-                              description: 'Use this card style for new internship posts.',
-                              id: 'INT-TEMPLATE',
+                            // Show message when no results
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.school_outlined, size: 64, color: Colors.grey.shade400),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _searchQuery.isEmpty ? 'No internships available' : 'No internships found matching "$_searchQuery"',
+                                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
                             );
                           }
                           final it = items[index];

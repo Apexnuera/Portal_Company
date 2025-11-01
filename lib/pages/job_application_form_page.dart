@@ -4,6 +4,7 @@ import '../widgets/app_header_clean.dart';
 import '../data/application_store.dart';
 import '../utils/resume_picker_stub.dart'
     if (dart.library.html) '../utils/resume_picker_web.dart';
+import '../utils/validators.dart';
 
 class JobApplicationFormPage extends StatefulWidget {
   final String jobId;
@@ -128,7 +129,7 @@ class _JobApplicationFormPageState extends State<JobApplicationFormPage> {
                                       borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your email' : null,
+                                  validator: Validators.validateEmail,
                                 ),
                                 const SizedBox(height: 12),
 

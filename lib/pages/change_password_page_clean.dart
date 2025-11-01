@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/app_header_clean.dart';
+import '../utils/validators.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -107,8 +108,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                 TextFormField(
                                   controller: _newController,
                                   obscureText: _obscureNew,
+                                  maxLength: 10,
                                   decoration: InputDecoration(
-                                    labelText: 'New Password',
+                                    labelText: 'New Password (10 chars: Capital, lowercase, numbers, symbols)',
+                                    counterText: '',
                                     prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFFFF782B)),
                                     suffixIcon: IconButton(
                                       onPressed: () => setState(() => _obscureNew = !_obscureNew),
@@ -123,7 +126,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                       borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) => (v == null || v.isEmpty) ? 'Please enter new password' : null,
+                                  validator: Validators.validatePassword,
                                 ),
                                 const SizedBox(height: 12),
 
@@ -131,8 +134,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                 TextFormField(
                                   controller: _confirmController,
                                   obscureText: _obscureConfirm,
+                                  maxLength: 10,
                                   decoration: InputDecoration(
                                     labelText: 'Confirm New Password',
+                                    counterText: '',
                                     prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFFFF782B)),
                                     suffixIcon: IconButton(
                                       onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
@@ -147,11 +152,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                       borderSide: const BorderSide(color: Color(0xFFFF782B), width: 2),
                                     ),
                                   ),
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) return 'Please confirm new password';
-                                    if (v != _newController.text) return 'Passwords do not match';
-                                    return null;
-                                  },
+                                  validator: (v) => Validators.validateConfirmPassword(v, _newController.text),
                                 ),
                                 const SizedBox(height: 16),
 

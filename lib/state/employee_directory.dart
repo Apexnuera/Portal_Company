@@ -26,7 +26,12 @@ class EmployeePersonalDetails {
     this.bankIfscCode = '',
     this.bankName = '',
     this.bankDetailsLocked = false,
-  }) : assignedAssets = assignedAssets ?? <String>{};
+    this.currentProjectName = '',
+    this.currentProjectDuration = '',
+    this.currentProjectManager = '',
+    List<ProjectAllocationEntry>? projectHistory,
+  })  : assignedAssets = assignedAssets ?? <String>{},
+        projectHistory = projectHistory ?? <ProjectAllocationEntry>[];
 
   String fullName;
   String familyName;
@@ -48,6 +53,10 @@ class EmployeePersonalDetails {
   String bankIfscCode;
   String bankName;
   bool bankDetailsLocked;
+  String currentProjectName;
+  String currentProjectDuration;
+  String currentProjectManager;
+  List<ProjectAllocationEntry> projectHistory;
 
   EmployeePersonalDetails copy() {
     return EmployeePersonalDetails(
@@ -75,6 +84,30 @@ class EmployeePersonalDetails {
       bankIfscCode: bankIfscCode,
       bankName: bankName,
       bankDetailsLocked: bankDetailsLocked,
+      currentProjectName: currentProjectName,
+      currentProjectDuration: currentProjectDuration,
+      currentProjectManager: currentProjectManager,
+      projectHistory: projectHistory.map((e) => e.copy()).toList(),
+    );
+  }
+}
+
+class ProjectAllocationEntry {
+  ProjectAllocationEntry({
+    this.projectName = '',
+    this.duration = '',
+    this.reportingManager = '',
+  });
+
+  String projectName;
+  String duration;
+  String reportingManager;
+
+  ProjectAllocationEntry copy() {
+    return ProjectAllocationEntry(
+      projectName: projectName,
+      duration: duration,
+      reportingManager: reportingManager,
     );
   }
 }
@@ -420,6 +453,10 @@ class EmployeeDirectory extends ChangeNotifier {
       bankIfscCode: '',
       bankName: '',
       bankDetailsLocked: false,
+      currentProjectName: '',
+      currentProjectDuration: '',
+      currentProjectManager: '',
+      projectHistory: <ProjectAllocationEntry>[],
     );
 
     final professional = EmployeeProfessionalProfile(
