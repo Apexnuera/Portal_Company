@@ -2,13 +2,10 @@
 // Copy this content to timesheet_tabs.dart
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/timesheet_service.dart';
-import '../utils/document_picker.dart';
 
 // Simple placeholder tabs - will be enhanced
 class EmployeeAttendanceTab extends StatelessWidget {
-  const EmployeeAttendanceTab({Key? key, required this.employeeId, required this.isHrMode}) : super(key: key);
+  const EmployeeAttendanceTab({super.key, required this.employeeId, required this.isHrMode});
   final String employeeId;
   final bool isHrMode;
 
@@ -19,7 +16,7 @@ class EmployeeAttendanceTab extends StatelessWidget {
 }
 
 class LeaveRequestTab extends StatelessWidget {
-  const LeaveRequestTab({Key? key, required this.employeeId, required this.isHrMode}) : super(key: key);
+  const LeaveRequestTab({super.key, required this.employeeId, required this.isHrMode});
   final String employeeId;
   final bool isHrMode;
 
@@ -30,7 +27,7 @@ class LeaveRequestTab extends StatelessWidget {
 }
 
 class WFHRequestTab extends StatelessWidget {
-  const WFHRequestTab({Key? key, required this.employeeId, required this.isHrMode}) : super(key: key);
+  const WFHRequestTab({super.key, required this.employeeId, required this.isHrMode});
   final String employeeId;
   final bool isHrMode;
 
@@ -41,7 +38,7 @@ class WFHRequestTab extends StatelessWidget {
 }
 
 class HolidayCalendarTab extends StatelessWidget {
-  const HolidayCalendarTab({Key? key, required this.employeeId, required this.isHrMode}) : super(key: key);
+  const HolidayCalendarTab({super.key, required this.employeeId, required this.isHrMode});
   final String employeeId;
   final bool isHrMode;
 

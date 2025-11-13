@@ -1,6 +1,10 @@
-import 'dart:html' as html;
-import 'dart:typed_data';
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
+import 'dart:typed_data';
+
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 class ImagePickerWeb {
   static Future<Uint8List?> pickImage() async {

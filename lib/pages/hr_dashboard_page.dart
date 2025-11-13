@@ -1,6 +1,4 @@
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,7 +8,9 @@ import '../data/application_store.dart';
 import '../state/employee_directory.dart';
 import 'hr_employee_portal_page.dart';
 import '../services/alert_service.dart';
-import '../utils/document_picker_web.dart';
+import '../utils/document_picker.dart';
+import '../utils/document_viewer.dart';
+import '../utils/document_saver.dart';
 
 enum _HRMenu { overview, queries, alerts, postJob, postInternship, employeeDetails, companyDrive }
 
@@ -104,7 +104,9 @@ class _CompanyDriveState extends ChangeNotifier {
         if (e.name.toLowerCase().contains(_query.toLowerCase())) all.add(e);
       } else {
         if (e.name.toLowerCase().contains(_query.toLowerCase())) all.add(e);
-        for (final c in e.children) dfs(c);
+        for (final c in e.children) {
+          dfs(c);
+        }
       }
     }
     dfs(root);
@@ -146,14 +148,11 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
 
   Future<void> _onUpload() async {
     final doc = await pickDocument(context);
-    if (doc != null) {
-      _state.uploadFile(name: doc.name, data: doc.data, mimeType: doc.type);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Uploaded ${doc.name}')),
-        );
-      }
-    }
+    if (!mounted || doc == null) return;
+    _state.uploadFile(name: doc.name, data: doc.data, mimeType: doc.type);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Uploaded ${doc.name}')),
+    );
   }
 
   Future<void> _onNewFolder() async {
@@ -177,6 +176,7 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
         ],
       ),
     );
+    if (!mounted) return;
     if (name != null && name.isNotEmpty) {
       _state.createFolder(name);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Folder "$name" created')));
@@ -204,6 +204,7 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
         ],
       ),
     );
+    if (!mounted) return;
     if (name != null && name.isNotEmpty) {
       _state.rename(entry, name);
     }
@@ -229,24 +230,30 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
         ],
       ),
     );
+    if (!mounted) return;
     if (ok == true) _state.delete(entry);
   }
 
-  void _download(_DriveEntry entry) {
+  Future<void> _download(_DriveEntry entry) async {
     if (entry.isFolder || entry.data == null) return;
-    final blob = html.Blob([entry.data!], entry.mimeType ?? 'application/octet-stream');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)..download = entry.name;
-    anchor.click();
-    html.Url.revokeObjectUrl(url);
+    final saved = await saveDocumentBytes(bytes: entry.data!, fileName: entry.name);
+    if (!mounted) return;
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Download not supported on this platform.')),
+      );
+    }
   }
 
-  void _openFile(_DriveEntry entry) {
+  Future<void> _openFile(_DriveEntry entry) async {
     if (entry.isFolder || entry.data == null) return;
-    final blob = html.Blob([entry.data!], entry.mimeType ?? 'application/octet-stream');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.window.open(url, '_blank');
-    Future.delayed(const Duration(seconds: 3), () => html.Url.revokeObjectUrl(url));
+    final opened = await openDocumentBytes(bytes: entry.data!, fileName: entry.name);
+    if (!mounted) return;
+    if (!opened) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preview not supported on this platform.')),
+      );
+    }
   }
 
   String _formatSize(int bytes) {
@@ -603,7 +610,7 @@ class _AlertsModuleState extends State<_AlertsModule> {
                             Expanded(child: Text(a.text)),
                             Switch(
                               value: a.active,
-                              activeColor: const Color(0xFFFF782B),
+                              activeThumbColor: const Color(0xFFFF782B),
                               onChanged: (v) => context.read<AlertService>().toggleActive(a.id, v),
                             ),
                             IconButton(
@@ -946,7 +953,7 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                           context: context,
                           builder: (context) => _EditEmployeeDialog(employee: record),
                         );
-
+                        if (!context.mounted) return;
                         if (updatedRecord != null) {
                           _data.updateEmployee(record, updatedRecord);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -973,7 +980,7 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                             ],
                           ),
                         );
-
+                        if (!context.mounted) return;
                         if (confirmed == true) {
                           _data.removeEmployee(record);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -1165,7 +1172,6 @@ class _EmployeeListView extends StatefulWidget {
     required this.onEdit,
     required this.onDelete,
     this.showTitle = true,
-    super.key,
   });
 
   @override
@@ -1300,7 +1306,7 @@ class _EmployeeListViewState extends State<_EmployeeListView> {
               Row(
                 children: [
                   Text(
-                    'Showing ${start + 1}-${endExclusive} of ${widget.employees.length}',
+                    'Showing ${start + 1}-$endExclusive of ${widget.employees.length}',
                     style: TextStyle(color: Colors.grey.shade700),
                   ),
                   const Spacer(),
@@ -1316,7 +1322,7 @@ class _EmployeeListViewState extends State<_EmployeeListView> {
                     label: const Text('Previous'),
                   ),
                   const SizedBox(width: 8),
-                  Text('Page ${currentPage + 1} of ${_totalPages}'),
+                  Text('Page ${currentPage + 1} of $_totalPages'),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
                     onPressed: currentPage < maxPageIndex
@@ -1339,123 +1345,7 @@ class _EmployeeListViewState extends State<_EmployeeListView> {
   }
 }
 
-class _ViewEmployeeDialog extends StatelessWidget {
-  final _EmployeeRecord employee;
-  const _ViewEmployeeDialog({required this.employee});
-
-  Widget _buildDetailTile({required IconData icon, required String label, required String value}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF782B).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: const Color(0xFFFF782B), size: 22),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.visibility_outlined, color: Color(0xFFFF782B)),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Employee Details',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Close',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 1,
-                  childAspectRatio: 3.8,
-                  mainAxisSpacing: 16,
-                  children: [
-                    _buildDetailTile(
-                      icon: Icons.badge_outlined,
-                      label: 'Employee ID',
-                      value: employee.id,
-                    ),
-                    _buildDetailTile(
-                      icon: Icons.person_outline,
-                      label: 'Employee Name',
-                      value: employee.name,
-                    ),
-                    _buildDetailTile(
-                      icon: Icons.email_outlined,
-                      label: 'Employee Email',
-                      value: employee.email,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// _ViewEmployeeDialog removed as unused
 
 class _EditEmployeeDialog extends StatefulWidget {
   final _EmployeeRecord employee;
@@ -1683,13 +1573,14 @@ class _JobsModuleState extends State<_JobsModule> {
       ),
     );
 
-    if (confirmed == true && mounted) {
-      final success = ApplicationStore.I.deleteJobApplication(email, jobId);
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Application deleted successfully')),
-        );
-      }
+    if (!context.mounted) return;
+    if (confirmed != true) return;
+    final success = ApplicationStore.I.deleteJobApplication(email, jobId);
+    if (!context.mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Application deleted successfully')),
+      );
     }
   }
 
@@ -1816,13 +1707,14 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
       ),
     );
 
-    if (confirmed == true && mounted) {
-      final success = ApplicationStore.I.deleteInternshipApplication(email, internshipId);
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Application deleted successfully')),
-        );
-      }
+    if (!context.mounted) return;
+    if (confirmed != true) return;
+    final success = ApplicationStore.I.deleteInternshipApplication(email, internshipId);
+    if (!context.mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Application deleted successfully')),
+      );
     }
   }
 
@@ -1852,9 +1744,9 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
                       unselectedLabelColor: Colors.black54,
                       indicatorSize: TabBarIndicatorSize.tab,
                       indicator: BoxDecoration(
-                        color: const Color(0xFFFF782B).withOpacity(0.12),
+                        color: const Color(0xFFFF782B).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.5)),
+                        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.5)),
                       ),
                       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
                       tabs: const [
@@ -2307,50 +2199,7 @@ class _ApplicationCard extends StatelessWidget {
   }
 }
 
-class _InfoItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _InfoItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 14, color: Colors.black54),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-}
+// _InfoItem removed as unused
 
 class _StatusChipDropdown extends StatelessWidget {
   final String currentStatus;
@@ -2364,21 +2213,17 @@ class _StatusChipDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Color statusColor;
-    IconData statusIcon;
     // TODO: Add more status options
     switch (currentStatus) {
       case 'Selected':
         statusColor = const Color(0xFF4CAF50);
-        statusIcon = Icons.check_circle;
         break;
       case 'Rejected':
         statusColor = const Color(0xFFF44336);
-        statusIcon = Icons.cancel;
         break;
       case 'In Progress':
       default:
         statusColor = const Color(0xFFFF9800);
-        statusIcon = Icons.pending;
         break;
     }
 
@@ -2632,7 +2477,7 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
                     onSelect: (m) => setState(() => _selected = m),
                   ),
                   const VerticalDivider(width: 1),
-                  Expanded(child: _RightPanel(selected: _selected)),
+                  Expanded(child: _RightPanel(selected: _selected, onSelect: (m) => setState(() => _selected = m))),
                 ],
               );
             }
@@ -2643,7 +2488,7 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
                   onSelect: (m) => setState(() => _selected = m),
                 ),
                 const Divider(height: 1),
-                Expanded(child: _RightPanel(selected: _selected)),
+                Expanded(child: _RightPanel(selected: _selected, onSelect: (m) => setState(() => _selected = m))),
               ],
             );
           },
@@ -2781,13 +2626,14 @@ class _TopNav extends StatelessWidget {
 
 class _RightPanel extends StatelessWidget {
   final _HRMenu selected;
-  const _RightPanel({required this.selected});
+  final ValueChanged<_HRMenu> onSelect;
+  const _RightPanel({required this.selected, required this.onSelect});
   @override
   Widget build(BuildContext context) {
     Widget child;
     switch (selected) {
       case _HRMenu.overview:
-        child = _WelcomePanel();
+        child = _WelcomePanel(onSelect: onSelect);
         break;
       case _HRMenu.queries:
         child = const _QueriesList();
@@ -2858,6 +2704,8 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _WelcomePanel extends StatelessWidget {
+  final ValueChanged<_HRMenu> onSelect;
+  const _WelcomePanel({required this.onSelect});
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -2888,7 +2736,7 @@ class _WelcomePanel extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Welcome back! Here\'s a summary of your HR operations.',
-                    style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.9)),
+                    style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.9)),
                   ),
                 ],
               ),
@@ -2909,7 +2757,7 @@ class _WelcomePanel extends StatelessWidget {
                   children: [
                     Expanded(child: _RecentActivities()),
                     const SizedBox(width: 16),
-                    Expanded(child: _QuickActions()),
+                    Expanded(child: _QuickActions(onSelect: onSelect)),
                   ],
                 );
               }
@@ -2917,7 +2765,7 @@ class _WelcomePanel extends StatelessWidget {
                 children: [
                   _RecentActivities(),
                   const SizedBox(height: 16),
-                  _QuickActions(),
+                  _QuickActions(onSelect: onSelect),
                 ],
               );
             },
@@ -3001,7 +2849,7 @@ class _MetricCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: color, size: 24),
@@ -3101,7 +2949,7 @@ class _RecentActivities extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: (activity['color'] as Color).withOpacity(0.1),
+                        color: (activity['color'] as Color).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(activity['icon'] as IconData, color: activity['color'] as Color, size: 20),
@@ -3140,6 +2988,8 @@ class _RecentActivities extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
+  final ValueChanged<_HRMenu> onSelect;
+  const _QuickActions({required this.onSelect});
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -3161,46 +3011,31 @@ class _QuickActions extends StatelessWidget {
             _QuickActionButton(
               icon: Icons.work_outline,
               label: 'Post New Job',
-              onTap: () {
-                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
-                state?.setState(() => state._selected = _HRMenu.postJob);
-              },
+              onTap: () => onSelect(_HRMenu.postJob),
             ),
             const SizedBox(height: 8),
             _QuickActionButton(
               icon: Icons.school_outlined,
               label: 'Post Internship',
-              onTap: () {
-                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
-                state?.setState(() => state._selected = _HRMenu.postInternship);
-              },
+              onTap: () => onSelect(_HRMenu.postInternship),
             ),
             const SizedBox(height: 8),
             _QuickActionButton(
               icon: Icons.campaign_outlined,
               label: 'Create Alert',
-              onTap: () {
-                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
-                state?.setState(() => state._selected = _HRMenu.alerts);
-              },
+              onTap: () => onSelect(_HRMenu.alerts),
             ),
             const SizedBox(height: 8),
             _QuickActionButton(
               icon: Icons.people_outline,
               label: 'View Employees',
-              onTap: () {
-                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
-                state?.setState(() => state._selected = _HRMenu.employeeDetails);
-              },
+              onTap: () => onSelect(_HRMenu.employeeDetails),
             ),
             const SizedBox(height: 8),
             _QuickActionButton(
               icon: Icons.folder_open,
               label: 'Company Drive',
-              onTap: () {
-                final state = context.findAncestorStateOfType<_HRDashboardPageState>();
-                state?.setState(() => state._selected = _HRMenu.companyDrive);
-              },
+              onTap: () => onSelect(_HRMenu.companyDrive),
             ),
           ],
         ),

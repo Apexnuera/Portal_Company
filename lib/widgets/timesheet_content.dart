@@ -1,12 +1,8 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/timesheet_service.dart';
-import '../utils/document_picker.dart';
 import 'timesheet_tabs.dart';
 
 class TimeSheetContent extends StatefulWidget {
-  const TimeSheetContent({Key? key, required this.employeeId, this.isHrMode = false}) : super(key: key);
+  const TimeSheetContent({super.key, required this.employeeId, this.isHrMode = false});
   final String employeeId;
   final bool isHrMode;
 
@@ -34,7 +30,11 @@ class _TimeSheetContentState extends State<TimeSheetContent> with SingleTickerPr
     return Column(
       children: [
         Container(
-          color: const Color(0xFFFF782B).withOpacity(0.1),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF782B).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: TabBar(
             controller: _tabController,
             labelColor: const Color(0xFFFF782B),

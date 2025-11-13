@@ -1,12 +1,12 @@
-import 'dart:typed_data';
-import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/employee_directory.dart';
 import '../utils/document_picker.dart';
+import '../utils/document_viewer.dart';
+import '../utils/document_saver.dart';
 
 class CompensationContent extends StatefulWidget {
-  const CompensationContent({Key? key, required this.employeeId, this.isHrMode = false}) : super(key: key);
+  const CompensationContent({super.key, required this.employeeId, this.isHrMode = false});
   final String employeeId;
   final bool isHrMode;
 
@@ -18,52 +18,24 @@ class _CompensationContentState extends State<CompensationContent> {
   int? _selectedYear;
   int? _selectedMonth;
 
-  String _guessMime(String name) {
-    final ext = name.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'bmp':
-        return 'image/bmp';
-      case 'webp':
-        return 'image/webp';
-      case 'txt':
-        return 'text/plain';
-      case 'rtf':
-        return 'application/rtf';
-      case 'doc':
-        return 'application/msword';
-      case 'docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      default:
-        return 'application/octet-stream';
+  Future<void> _openDocument(BuildContext ctx, CompensationDocument doc) async {
+    final opened = await openDocumentBytes(bytes: doc.data, fileName: doc.name);
+    if (!ctx.mounted) return;
+    if (!opened) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text('Document preview not supported on this platform.')),
+      );
     }
   }
 
-  void _openDocument(CompensationDocument doc) {
-    final blob = html.Blob(<Uint8List>[doc.data], _guessMime(doc.name));
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.window.open(url, '_blank');
-    html.Url.revokeObjectUrl(url);
-  }
-
-  void _downloadDocument(CompensationDocument doc) {
-    final blob = html.Blob(<Uint8List>[doc.data], _guessMime(doc.name));
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
-      ..download = doc.name
-      ..style.display = 'none';
-    html.document.body?.append(anchor);
-    anchor.click();
-    anchor.remove();
-    html.Url.revokeObjectUrl(url);
+  Future<void> _downloadDocument(BuildContext ctx, CompensationDocument doc) async {
+    final saved = await saveDocumentBytes(bytes: doc.data, fileName: doc.name);
+    if (!ctx.mounted) return;
+    if (!saved) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text('Download not supported on this platform.')),
+      );
+    }
   }
 
   @override
@@ -226,21 +198,26 @@ class _CompensationContentState extends State<CompensationContent> {
         else
           ...itemsToShow.map((doc) => Card(
                 child: InkWell(
-                  onDoubleTap: () => _openDocument(doc),
+                  onDoubleTap: () => _openDocument(context, doc),
                   child: ListTile(
                     leading: const Icon(Icons.description_outlined),
                     title: Text(doc.name),
                     subtitle: Text('Uploaded on: ${doc.date.day}/${doc.date.month}/${doc.date.year}'),
-                    trailing: widget.isHrMode
-                        ? IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () => context.read<EmployeeDirectory>().removeCompensationDocument(widget.employeeId, title, doc),
-                          )
-                        : IconButton(
-                            tooltip: 'Download',
-                            icon: const Icon(Icons.download_outlined),
-                            onPressed: () => _downloadDocument(doc),
-                          ),
+                    trailing: Wrap(
+                      spacing: 8,
+                      children: [
+                        IconButton(
+                          onPressed: () => _openDocument(context, doc),
+                          icon: const Icon(Icons.visibility_outlined),
+                          tooltip: 'View Document',
+                        ),
+                        IconButton(
+                          onPressed: () => _downloadDocument(context, doc),
+                          icon: const Icon(Icons.download_outlined),
+                          tooltip: 'Download',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               )),
@@ -284,10 +261,11 @@ class _EditableNumberField extends StatelessWidget {
       );
     }
 
+    final controller = TextEditingController(text: value.toString());
     return SizedBox(
       width: 220,
       child: TextFormField(
-        initialValue: value.toString(),
+        controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
         onChanged: (str) {

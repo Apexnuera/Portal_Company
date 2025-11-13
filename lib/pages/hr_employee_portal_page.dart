@@ -1,8 +1,8 @@
-import 'dart:html' as html;
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../utils/document_picker.dart';
+import '../utils/document_viewer.dart';
 import '../services/timesheet_service.dart';
 import '../state/employee_directory.dart';
 import '../services/faq_service.dart';
@@ -150,11 +150,10 @@ class _SimpleEditableListState extends State<_SimpleEditableList> {
         children: [
           Expanded(
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
+                color: const Color(0xFFFF782B).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: const Text('No data available'),
             ),
@@ -326,7 +325,7 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
         children: [
           Container(
             height: 60,
-            color: const Color(0xFFFF782B).withOpacity(0.1), // Light orange background
+            color: const Color(0xFFFF782B).withValues(alpha: 0.1), // Light orange background
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -535,7 +534,7 @@ class _PersonalDetailsEditorState extends State<_PersonalDetailsEditor> {
           ),
           _DropdownField<String>(
             label: 'Blood Group',
-            value: _bloodGroup.isEmpty ? null : _bloodGroup,
+            initialValue: _bloodGroup.isEmpty ? null : _bloodGroup,
             items: const ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
             isEditMode: widget.isEditMode,
             onChanged: (value) {
@@ -833,36 +832,23 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
 
   Future<void> _pickEducationDocument(_HREducationEntryForm form) async {
     if (!widget.isEditMode) return;
-    final input = html.FileUploadInputElement()
-      ..accept = '*/*'
-      ..click();
-    await input.onChange.first;
-    if (input.files == null || input.files!.isEmpty) {
-      return;
+    final file = await pickDocument(context);
+    if (file != null) {
+      setState(() {
+        form.documentName = file.name;
+        form.documentBytes = file.data;
+      });
     }
-    final file = input.files!.first;
-    final reader = html.FileReader()..readAsArrayBuffer(file);
-    await reader.onLoad.first;
-    final buffer = reader.result as ByteBuffer;
-    final bytes = buffer.asUint8List();
-    setState(() {
-      form
-        ..documentName = file.name
-        ..documentBytes = Uint8List.fromList(bytes);
-    });
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Uploaded ${file.name}')),
-    );
-    _writeBackProfile();
   }
 
-  void _openDocument(String name, Uint8List? bytes) {
+  Future<void> _openDocument(String name, Uint8List? bytes) async {
     if (bytes == null) return;
-    final blob = html.Blob(<Uint8List>[bytes]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.window.open(url, '_blank');
-    html.Url.revokeObjectUrl(url);
+    final opened = await openDocumentBytes(bytes: bytes, fileName: name);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Document preview not supported on this platform.')),
+      );
+    }
   }
 
   @override
@@ -880,7 +866,8 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: DropdownButtonFormField<String>(
-                value: _employmentType.text.isEmpty ? null : _employmentType.text,
+                key: ValueKey(_employmentType.text),
+                initialValue: _employmentType.text.isEmpty ? null : _employmentType.text,
                 decoration: const InputDecoration(
                   labelText: 'Employment type',
                   border: OutlineInputBorder(),
@@ -1029,7 +1016,8 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
     final availableLevels = <String>{..._defaultEducationLevels, if (form.level.isNotEmpty) form.level};
     final levelField = widget.isEditMode
         ? DropdownButtonFormField<String>(
-            value: form.level.isEmpty ? null : form.level,
+            key: ValueKey('${form.level}-$index'),
+            initialValue: form.level.isEmpty ? null : form.level,
             decoration: const InputDecoration(
               labelText: 'Education Level',
               border: OutlineInputBorder(),
@@ -1315,28 +1303,13 @@ class _ProfessionalProfileEditorState extends State<_ProfessionalProfileEditor> 
 
   Future<void> _pickEmploymentDocument(_HREmploymentEntryForm form) async {
     if (!widget.isEditMode) return;
-    final input = html.FileUploadInputElement()
-      ..accept = '*/*'
-      ..click();
-    await input.onChange.first;
-    if (input.files == null || input.files!.isEmpty) {
-      return;
+    final file = await pickDocument(context);
+    if (file != null) {
+      setState(() {
+        form.documentName = file.name;
+        form.documentBytes = file.data;
+      });
     }
-    final file = input.files!.first;
-    final reader = html.FileReader()..readAsArrayBuffer(file);
-    await reader.onLoad.first;
-    final buffer = reader.result as ByteBuffer;
-    final bytes = buffer.asUint8List();
-    setState(() {
-      form
-        ..documentName = file.name
-        ..documentBytes = Uint8List.fromList(bytes);
-    });
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Uploaded ${file.name}')),
-    );
-    _writeBackProfile();
   }
 
   String _formatDate(DateTime value) {
@@ -1367,22 +1340,22 @@ class _TaxInformationEditor extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           if (isEditMode)
-            Row(
-              children: [
-                Radio<String>(
-                  value: 'New',
-                  groupValue: record.tax.regime,
-                  onChanged: (v) => record.tax.regime = v ?? '',
-                ),
-                const Text('New tax regime'),
-                const SizedBox(width: 24),
-                Radio<String>(
-                  value: 'Old',
-                  groupValue: record.tax.regime,
-                  onChanged: (v) => record.tax.regime = v ?? '',
-                ),
-                const Text('Old tax regime'),
-              ],
+            RadioGroup<String>(
+              groupValue: record.tax.regime.isEmpty ? null : record.tax.regime,
+              onChanged: (value) {
+                record.tax.regime = value ?? '';
+              },
+              child: Row(
+                children: const [
+                  Radio<String>(value: 'New'),
+                  SizedBox(width: 4),
+                  Text('New tax regime'),
+                  SizedBox(width: 24),
+                  Radio<String>(value: 'Old'),
+                  SizedBox(width: 4),
+                  Text('Old tax regime'),
+                ],
+              ),
             )
           else
             _KeyValueTile('Selected Tax Regime', record.tax.regime.isEmpty ? 'Not selected' : record.tax.regime),
@@ -1710,14 +1683,14 @@ class _DatePickerField extends StatelessWidget {
 class _DropdownField<T> extends StatelessWidget {
   const _DropdownField({
     required this.label,
-    required this.value,
+    required this.initialValue,
     required this.items,
     required this.onChanged,
     this.isEditMode = true,
   });
 
   final String label;
-  final T? value;
+  final T? initialValue;
   final List<T> items;
   final ValueChanged<T?> onChanged;
   final bool isEditMode;
@@ -1725,54 +1698,40 @@ class _DropdownField<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!isEditMode) {
-      // Read-only mode
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                value?.toString() ?? 'Not selected',
-                style: const TextStyle(fontSize: 16, color: Colors.black87),
-              ),
-            ),
-          ],
+        child: Container(
+          width: 260,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 6),
+              Text(initialValue?.toString() ?? 'Not set', style: const TextStyle(fontSize: 16)),
+            ],
+          ),
         ),
       );
     }
 
-    // Edit mode
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<T>(
-        value: value,
+        key: ValueKey(initialValue),
+        initialValue: initialValue,
         items: items
             .map((item) => DropdownMenuItem<T>(
                   value: item,
                   child: Text(item.toString()),
                 ))
             .toList(),
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
+        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
         onChanged: onChanged,
       ),
     );

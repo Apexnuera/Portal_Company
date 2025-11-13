@@ -15,10 +15,10 @@ class AppHeader extends StatelessWidget {
         vertical: 20.0,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -29,7 +29,8 @@ class AppHeader extends StatelessWidget {
   }
 
   Widget _buildDesktopHeader(BuildContext context) {
-    final location = GoRouter.of(context).routeInformationProvider.value.location;
+    final uri = GoRouter.of(context).routeInformationProvider.value.uri;
+    final location = uri.toString();
     final showSearch =
         location.startsWith('/career/jobs') ||
         location.startsWith('/career/internships') ||
@@ -105,7 +106,8 @@ class AppHeader extends StatelessWidget {
       'Career',
       'Login',
     ];
-    final routeName = GoRouter.of(context).routeInformationProvider.value.location;
+    final routeUri = GoRouter.of(context).routeInformationProvider.value.uri;
+    final routeName = routeUri.toString();
     const activeColor = Color(0xFFFF782B);
     const baseColor = Colors.black87;
     return Row(
@@ -336,11 +338,11 @@ class AppHeader extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide(color: const Color(0xFFFF782B).withOpacity(0.4)),
+            borderSide: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.4)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide(color: const Color(0xFFFF782B).withOpacity(0.3)),
+            borderSide: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.3)),
           ),
           focusedBorder: const OutlineInputBorder(
             borderRadius: BorderRadius.all(Radius.circular(24)),

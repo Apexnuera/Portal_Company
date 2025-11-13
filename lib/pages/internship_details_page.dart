@@ -118,9 +118,9 @@ class InternshipDetailsPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF782B).withOpacity(0.08),
+        color: const Color(0xFFFF782B).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.25)),
+        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

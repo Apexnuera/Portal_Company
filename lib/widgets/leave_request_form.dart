@@ -112,7 +112,8 @@ class _LeaveRequestFormState extends State<LeaveRequestForm> {
           
           // Leave Type Dropdown
           DropdownButtonFormField<String>(
-            value: _selectedLeaveType,
+            key: ValueKey(_selectedLeaveType),
+            initialValue: _selectedLeaveType,
             decoration: const InputDecoration(
               labelText: 'Leave Type',
               border: OutlineInputBorder(),

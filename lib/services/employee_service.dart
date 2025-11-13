@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 
 class EmployeeService extends ChangeNotifier {
   EmployeeService._internal();
@@ -12,7 +13,7 @@ class EmployeeService extends ChangeNotifier {
   
   // Alerts data
   int _unreadAlertsCount = 3; // Default to 3 unread alerts
-  List<String> _alerts = [
+  final List<String> _alerts = [
     'New company policy update available',
     'Your compensation details have been updated',
     'Time sheet submission deadline reminder',

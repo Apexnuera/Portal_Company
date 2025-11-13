@@ -65,8 +65,11 @@ class _JobsListingPageState extends State<JobsListingPage> {
                 final width = constraints.maxWidth;
                 // Responsive columns
                 int crossAxisCount = 1;
-                if (width >= 1200) crossAxisCount = 3;
-                else if (width >= 800) crossAxisCount = 2;
+                if (width >= 1200) {
+                  crossAxisCount = 3;
+                } else if (width >= 800) {
+                  crossAxisCount = 2;
+                }
 
                 final cardAspect = width < 600 ? 1.7 : 1.6;
 
@@ -153,7 +156,7 @@ class _JobCard extends StatelessWidget {
       elevation: 3,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: const Color(0xFFFF782B).withOpacity(0.25)),
+        side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.25)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -168,7 +171,7 @@ class _JobCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF782B).withOpacity(0.1),
+                      color: const Color(0xFFFF782B).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.work_outline, color: Color(0xFFFF782B)),
@@ -213,7 +216,7 @@ class _JobCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF782B).withOpacity(0.1),
+                      color: const Color(0xFFFF782B).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(

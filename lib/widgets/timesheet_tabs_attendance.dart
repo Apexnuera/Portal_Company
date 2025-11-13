@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/timesheet_service.dart';
 
 class EmployeeAttendanceTab extends StatefulWidget {
-  const EmployeeAttendanceTab({Key? key, required this.employeeId, required this.isHrMode}) : super(key: key);
+  const EmployeeAttendanceTab({super.key, required this.employeeId, required this.isHrMode});
   final String employeeId;
   final bool isHrMode;
 
@@ -13,8 +13,22 @@ class EmployeeAttendanceTab extends StatefulWidget {
 
 class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   DateTime? _selectedDate;
-  int? _selectedMonth;
-  int? _selectedYear;
+  late TextEditingController _monthController;
+  late TextEditingController _yearController;
+
+  @override
+  void initState() {
+    super.initState();
+    _monthController = TextEditingController();
+    _yearController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _monthController.dispose();
+    _yearController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,13 +97,14 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
           SizedBox(
             width: 180,
             child: DropdownButtonFormField<int>(
-              value: _selectedYear,
+              hint: const Text('Year'),
+              initialValue: _yearController.text.isEmpty ? null : int.tryParse(_yearController.text),
               decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
               items: List.generate(5, (i) => DateTime.now().year - i)
                   .map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
                   .toList(),
               onChanged: (val) => setState(() {
-                _selectedYear = val;
+                _yearController.text = val?.toString() ?? '';
                 _selectedDate = null;
               }),
             ),
@@ -97,13 +112,14 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
           SizedBox(
             width: 180,
             child: DropdownButtonFormField<int>(
-              value: _selectedMonth,
+              hint: const Text('Month'),
+              initialValue: _monthController.text.isEmpty ? null : int.tryParse(_monthController.text),
               decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
               items: List.generate(12, (i) => i + 1)
                   .map((m) => DropdownMenuItem(value: m, child: Text(_getMonthName(m))))
                   .toList(),
               onChanged: (val) => setState(() {
-                _selectedMonth = val;
+                _monthController.text = val?.toString() ?? '';
                 _selectedDate = null;
               }),
             ),
@@ -126,11 +142,11 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
               label: Text(_selectedDate == null ? 'Select Specific Date' : ts.formatDate(_selectedDate!)),
             ),
           ),
-          if (_selectedYear != null || _selectedMonth != null || _selectedDate != null)
+          if (_yearController.text.isNotEmpty || _monthController.text.isNotEmpty || _selectedDate != null)
             TextButton.icon(
               onPressed: () => setState(() {
-                _selectedYear = null;
-                _selectedMonth = null;
+                _yearController.clear();
+                _monthController.clear();
                 _selectedDate = null;
               }),
               icon: const Icon(Icons.clear, color: Colors.red),
@@ -144,17 +160,19 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   Widget _buildAttendanceList(TimeSheetService ts) {
     var records = ts.attendanceRecords;
     if (widget.isHrMode) {
+      final selectedYear = int.tryParse(_yearController.text);
+      final selectedMonth = int.tryParse(_monthController.text);
       if (_selectedDate != null) {
         records = records.where((r) =>
             r.date.year == _selectedDate!.year &&
             r.date.month == _selectedDate!.month &&
             r.date.day == _selectedDate!.day).toList();
       } else {
-        if (_selectedYear != null) {
-          records = records.where((r) => r.date.year == _selectedYear).toList();
+        if (selectedYear != null) {
+          records = records.where((r) => r.date.year == selectedYear).toList();
         }
-        if (_selectedMonth != null) {
-          records = records.where((r) => r.date.month == _selectedMonth).toList();
+        if (selectedMonth != null) {
+          records = records.where((r) => r.date.month == selectedMonth).toList();
         }
       }
     }

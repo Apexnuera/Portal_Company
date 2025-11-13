@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/timesheet_service.dart';
 
 class HolidayCalendarTab extends StatefulWidget {
-  const HolidayCalendarTab({Key? key, required this.employeeId, required this.isHrMode}) : super(key: key);
+  const HolidayCalendarTab({super.key, required this.employeeId, required this.isHrMode});
   final String employeeId;
   final bool isHrMode;
 

@@ -137,9 +137,9 @@ class _JobApplicationFormPageState extends State<JobApplicationFormPage> {
                                 Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.3)),
+                                    border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.3)),
                                     borderRadius: BorderRadius.circular(10),
-                                    color: const Color(0xFFFF782B).withOpacity(0.05),
+                                    color: const Color(0xFFFF782B).withValues(alpha: 0.05),
                                   ),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,7 +154,7 @@ class _JobApplicationFormPageState extends State<JobApplicationFormPage> {
                                             label: const Text('Choose File'),
                                             style: OutlinedButton.styleFrom(
                                               foregroundColor: const Color(0xFFFF782B),
-                                              side: BorderSide(color: const Color(0xFFFF782B).withOpacity(0.6)),
+                                              side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
                                             ),
                                           ),
                                           const SizedBox(width: 10),

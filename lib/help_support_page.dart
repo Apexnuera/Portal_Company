@@ -71,15 +71,14 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         builder: (context, constraints) {
           // Compact mode if height is limited
           final compact = constraints.maxHeight < 620;
-          final cardMaxWidth = 640.0; // keep the form card at original width on wide screens
           final containerMaxWidth = isSmallScreen ? constraints.maxWidth - 24 : 980.0; // allow room for right sidebar
 
           // Contact info section (outside the main form content)
           final infoSection = Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFFF782B).withOpacity(0.08),
+              color: const Color(0xFFFF782B).withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFF782B).withOpacity(0.6), width: 1.2),
+              border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.6), width: 1.2),
             ),
             padding: EdgeInsets.all(compact ? 12 : (isSmallScreen ? 14 : 16)),
             child: Row(
@@ -87,7 +86,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
               children: [
                 Icon(
                   Icons.info_outline,
-                  color: const Color(0xFFFF782B).withOpacity(0.9),
+                  color: const Color(0xFFFF782B).withValues(alpha: 0.9),
                   size: compact ? 18 : 20,
                 ),
                 const SizedBox(width: 8),
@@ -157,7 +156,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                           Icon(
                             Icons.support_agent_outlined,
                             size: compact ? 44 : (isSmallScreen ? 48 : 56),
-                            color: const Color(0xFFFF782B).withOpacity(0.8),
+                            color: const Color(0xFFFF782B).withValues(alpha: 0.8),
                           ),
                           const SizedBox(height: 10),
                           Text(

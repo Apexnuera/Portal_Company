@@ -21,7 +21,7 @@ class AlertsPage extends StatelessWidget {
                     Icon(
                       Icons.notifications_outlined,
                       size: _getResponsiveIconSize(context),
-                      color: const Color(0xFFFF782B).withOpacity(0.7),
+                      color: const Color(0xFFFF782B).withValues(alpha: 0.7),
                     ),
                     const SizedBox(height: 24),
                     Text(

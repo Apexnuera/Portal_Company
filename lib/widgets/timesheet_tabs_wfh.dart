@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/timesheet_service.dart';
 
 class WFHRequestTab extends StatefulWidget {
-  const WFHRequestTab({Key? key, required this.employeeId, required this.isHrMode}) : super(key: key);
+  const WFHRequestTab({super.key, required this.employeeId, required this.isHrMode});
   final String employeeId;
   final bool isHrMode;
 
@@ -108,7 +108,8 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
           SizedBox(
             width: 150,
             child: DropdownButtonFormField<int>(
-              value: _filterYear,
+              key: ValueKey(_filterYear),
+              initialValue: _filterYear,
               decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
               items: List.generate(5, (i) => DateTime.now().year - i)
                   .map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
@@ -120,7 +121,8 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
           SizedBox(
             width: 150,
             child: DropdownButtonFormField<int>(
-              value: _filterMonth,
+              key: ValueKey(_filterMonth),
+              initialValue: _filterMonth,
               decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
               items: List.generate(12, (i) => i + 1)
                   .map((m) => DropdownMenuItem(value: m, child: Text(_getMonthName(m))))
@@ -183,7 +185,7 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: ts.getStatusColor(request.status).withOpacity(0.1),
+                        color: ts.getStatusColor(request.status).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(

@@ -39,7 +39,7 @@ class LoginPage extends StatelessWidget {
                           // Header Icon
                           Icon(
                             Icons.login_outlined,
-                            color: const Color(0xFFFF782B).withOpacity(0.8),
+                            color: const Color(0xFFFF782B).withValues(alpha: 0.8),
                           ),
 
                           const SizedBox(height: 8),
@@ -123,7 +123,7 @@ class LoginPage extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: const Color(0xFFFF782B).withOpacity(0.3),
+          color: const Color(0xFFFF782B).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -138,7 +138,7 @@ class LoginPage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF782B).withOpacity(0.1),
+                  color: const Color(0xFFFF782B).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -177,7 +177,7 @@ class LoginPage extends StatelessWidget {
               // Arrow Icon
               Icon(
                 Icons.arrow_forward_ios,
-                color: const Color(0xFFFF782B).withOpacity(0.7),
+                color: const Color(0xFFFF782B).withValues(alpha: 0.7),
                 size: isSmallScreen ? 18 : 20,
               ),
             ],

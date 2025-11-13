@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:typed_data';
 import 'package:provider/provider.dart';
-import '../services/timesheet_service.dart';
 import '../state/employee_directory.dart';
 import '../services/faq_service.dart';
 import '../widgets/timesheet_content.dart';
 import '../utils/document_picker.dart';
 import '../widgets/compensation_content.dart';
-import 'dart:html' as html;
 import '../services/alert_service.dart';
+import '../utils/image_picker.dart';
 import '../utils/validators.dart';
 
 class ProfessionalProfileContent extends StatefulWidget {
@@ -18,11 +16,11 @@ class ProfessionalProfileContent extends StatefulWidget {
   final void Function(EmployeeProfessionalProfile) onSaved;
 
   const ProfessionalProfileContent({
-    Key? key,
+    super.key,
     required this.initialProfile,
     this.forceEditMode = false,
     required this.onSaved,
-  }) : super(key: key);
+  });
 
   @override
   State<ProfessionalProfileContent> createState() => _ProfessionalProfileContentState();
@@ -281,7 +279,7 @@ class _ProfessionalProfileContentState extends State<ProfessionalProfileContent>
       ..clear()
       ..addAll(profile.education.map(_EducationEntryForm.new));
 
-    final existingLevels = _educationForms.map((form) => form.level).toSet();
+    final existingLevels = _educationForms.map((form) => form.levelController.text).toSet();
     for (final level in _defaultEducationLevels) {
       if (!existingLevels.contains(level)) {
         _educationForms.add(_EducationEntryForm(EmployeeEducationEntry(level: level)));
@@ -502,11 +500,11 @@ class _ProfessionalProfileContentState extends State<ProfessionalProfileContent>
   Widget _buildEducationCard(int index, _EducationEntryForm form) {
     final availableLevels = <String>{
       ..._defaultEducationLevels,
-      if (form.level.isNotEmpty) form.level,
+      if (form.levelController.text.isNotEmpty) form.levelController.text,
     };
     final levelField = _isEditMode
         ? DropdownButtonFormField<String>(
-            value: form.level.isEmpty ? null : form.level,
+            initialValue: form.levelController.text.isEmpty ? null : form.levelController.text,
             decoration: const InputDecoration(
               labelText: 'Education Level',
               border: OutlineInputBorder(),
@@ -519,11 +517,11 @@ class _ProfessionalProfileContentState extends State<ProfessionalProfileContent>
                 .toList(),
             onChanged: (value) {
               setState(() {
-                form.level = value ?? '';
+                form.levelController.text = value ?? '';
               });
             },
           )
-        : _buildReadOnlyField('Education Level', form.level);
+        : _buildReadOnlyField('Education Level', form.levelController.text);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -827,7 +825,7 @@ class _ProfessionalProfileContentState extends State<ProfessionalProfileContent>
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth > 800;
                 final employmentTypeField = DropdownButtonFormField<String>(
-                  value: _selectedEmploymentType,
+                  initialValue: _selectedEmploymentType?.isEmpty ?? true ? null : _selectedEmploymentType,
                   decoration: InputDecoration(
                     labelText: 'Employment type',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -979,25 +977,26 @@ class _ProfessionalProfileContentState extends State<ProfessionalProfileContent>
 }
 
 class _EducationEntryForm {
-  String level = '';
-  TextEditingController institution = TextEditingController();
-  TextEditingController degree = TextEditingController();
-  TextEditingController year = TextEditingController();
-  TextEditingController grade = TextEditingController();
+  late TextEditingController levelController;
+  late TextEditingController institution;
+  late TextEditingController degree;
+  late TextEditingController year;
+  late TextEditingController grade;
   String? documentName;
   Uint8List? documentBytes;
 
   _EducationEntryForm(EmployeeEducationEntry entry) {
-    level = entry.level;
-    institution.text = entry.institution;
-    degree.text = entry.degree;
-    year.text = entry.year;
-    grade.text = entry.grade;
+    levelController = TextEditingController(text: entry.level);
+    institution = TextEditingController(text: entry.institution);
+    degree = TextEditingController(text: entry.degree);
+    year = TextEditingController(text: entry.year);
+    grade = TextEditingController(text: entry.grade);
     documentName = entry.documentName;
-    documentBytes = entry.documentBytes;
+    documentBytes = entry.documentBytes != null ? Uint8List.fromList(entry.documentBytes!) : null;
   }
 
   void dispose() {
+    levelController.dispose();
     institution.dispose();
     degree.dispose();
     year.dispose();
@@ -1006,7 +1005,7 @@ class _EducationEntryForm {
 
   EmployeeEducationEntry toEntry() {
     return EmployeeEducationEntry(
-      level: level,
+      level: levelController.text,
       institution: institution.text,
       degree: degree.text,
       year: year.text,
@@ -1152,8 +1151,8 @@ class _EmployeeTopHeader extends StatelessWidget {
                   hintText: 'Search dashboard...',
                   prefixIcon: const Icon(Icons.search, size: 18, color: orange),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: orange.withOpacity(0.4))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: orange.withOpacity(0.3))),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: orange.withValues(alpha: 0.4))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: orange.withValues(alpha: 0.3))),
                   focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24)), borderSide: BorderSide(color: orange, width: 2)),
                   fillColor: Colors.white,
                   filled: true,
@@ -1346,7 +1345,7 @@ class _EmployeeSidebarState extends State<_EmployeeSidebar> {
     Widget item(String label, IconData icon, int index) {
       final isSelected = selected == index;
       return Material(
-        color: isSelected ? orange.withOpacity(0.08) : Colors.transparent,
+        color: isSelected ? orange.withValues(alpha: 0.08) : Colors.transparent,
         child: InkWell(
           onTap: () => _controller?.animateTo(index),
           child: Container(
@@ -1385,11 +1384,11 @@ class _EmployeeSidebarState extends State<_EmployeeSidebar> {
 
 class PersonalDetailsContent extends StatefulWidget {
   const PersonalDetailsContent({
-    Key? key,
+    super.key,
     required this.employeeId,
     this.forceReadOnly = false,
     this.isHrMode = false,
-  }) : super(key: key);
+  });
   final String employeeId;
   final bool forceReadOnly;
   final bool isHrMode;
@@ -1601,19 +1600,20 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
       firstDate: DateTime(1900),
       lastDate: DateTime.now().subtract(const Duration(days: 1)), // Cannot select today
     );
-    if (picked != null && picked != _dateOfBirth) {
-      // Validate age > 18
-      final validationError = Validators.validateDateOfBirth(picked);
-      if (validationError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(validationError)),
-        );
-        return;
-      }
-      setState(() {
-        _dateOfBirth = picked;
-      });
+    if (!context.mounted || picked == null || picked == _dateOfBirth) return;
+
+    // Validate age > 18
+    final validationError = Validators.validateDateOfBirth(picked);
+    if (validationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(validationError)),
+      );
+      return;
     }
+
+    setState(() {
+      _dateOfBirth = picked;
+    });
   }
 
   String _formatDate(DateTime? date) {
@@ -1694,8 +1694,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
   @override
   Widget build(BuildContext context) {
     final directory = context.watch<EmployeeDirectory>();
-    final record = directory.getById(widget.employeeId);
-    final p = record.personal;
+    directory.getById(widget.employeeId);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -1842,20 +1841,11 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     try {
-                      final input = html.FileUploadInputElement()..accept = 'image/*';
-                      input.click();
-                      await input.onChange.first;
-                      if (input.files!.isNotEmpty) {
-                        final file = input.files!.first;
-                        final reader = html.FileReader();
-                        reader.readAsArrayBuffer(file);
-                        await reader.onLoad.first;
-                        final bytes = reader.result as List<int>;
-                        if (context.mounted) {
-                          setState(() {
-                            _workingCopy.profileImageBytes = Uint8List.fromList(bytes);
-                          });
-                        }
+                      final bytes = await ImagePickerWeb.pickImage();
+                      if (bytes != null && context.mounted) {
+                        setState(() {
+                          _workingCopy.profileImageBytes = bytes;
+                        });
                       }
                     } catch (e) {
                       if (context.mounted) {
@@ -2159,119 +2149,11 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
 // TimeSheetContent is now in widgets/timesheet_content.dart
 
 class TaxInformationContent extends StatelessWidget {
-  const TaxInformationContent({Key? key, required this.employeeId}) : super(key: key);
+  const TaxInformationContent({super.key, required this.employeeId});
   final String employeeId;
 
   @override
   Widget build(BuildContext context) {
     return Center(child: Text('Tax Information for $employeeId'));
-  }
-}
-
-class _KeyValueTile extends StatelessWidget {
-  final String label;
-  final String value;
-  const _KeyValueTile(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 260,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 6),
-          Text(value.isEmpty ? 'Not set' : value, style: const TextStyle(fontSize: 16)),
-        ],
-      ),
-    );
-  }
-}
-
-// Old timesheet widgets removed - now using widgets/timesheet_tabs.dart
-
-class _TaxReadOnlyView extends StatelessWidget {
-  final String employeeId;
-  const _TaxReadOnlyView({required this.employeeId});
-  @override
-  Widget build(BuildContext context) {
-    final directory = context.watch<EmployeeDirectory>();
-    final record = directory.getById(employeeId);
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Tax Information (Read-Only)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
-          _KeyValue('Selected Tax Regime', record.tax.regime.isEmpty ? 'Not selected' : record.tax.regime),
-        ],
-      ),
-    );
-  }
-}
-
-class _KeyValue extends StatelessWidget {
-  final String label;
-  final String value;
-  const _KeyValue(this.label, this.value);
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 220,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          const SizedBox(height: 4),
-          Text(value.isEmpty ? 'Not set' : value, style: const TextStyle(fontSize: 16)),
-        ],
-      ),
-    );
-  }
-}
-
-class _KeyList extends StatelessWidget {
-  final String title;
-  final List<String> items;
-  const _KeyList(this.title, this.items);
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: items.isEmpty
-              ? const Text('No data available')
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: items.map((e) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text('• $e'))).toList(),
-                ),
-        ),
-      ],
-    );
   }
 }

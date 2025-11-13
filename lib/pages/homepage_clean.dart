@@ -25,8 +25,8 @@ class HomePage extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withOpacity(0.25),
-                        Colors.black.withOpacity(0.45),
+                        Colors.black.withValues(alpha: 0.25),
+                        Colors.black.withValues(alpha: 0.45),
                       ],
                     ),
                   ),
