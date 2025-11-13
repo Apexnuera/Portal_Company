@@ -1584,78 +1584,94 @@ class _JobsModuleState extends State<_JobsModule> {
     }
   }
 
+  Future<void> _openPostJobDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: const _PostJobFormInline(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: TabBar(
-                      labelColor: const Color(0xFFFF782B),
-                      unselectedLabelColor: Colors.black54,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      indicator: BoxDecoration(
-                        color: const Color(0xFFFF782B).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.5)),
-                      ),
-                      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                      tabs: const [
-                        Tab(text: 'Applications'),
-                        Tab(text: 'Post New Job'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Builder(builder: (context) {
-                    double h = MediaQuery.of(context).size.height - 330;
-                    if (h < 320) h = 320;
-                    if (h > 900) h = 900;
-                    return SizedBox(
-                      height: h,
-                      child: TabBarView(
-                        children: [
-                          _JobApplicationsList(
-                            currentPage: _currentPage,
-                            itemsPerPage: _itemsPerPage,
-                            onDownload: _downloadResume,
-                            onDelete: _deleteApplication,
-                          ),
-                          const _PostJobFormInline(),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
+    double listHeight = MediaQuery.of(context).size.height - 360;
+    if (listHeight < 320) listHeight = 320;
+    if (listHeight > 900) listHeight = 900;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
               ),
-            ),
+            ],
           ),
-          _currentPage > 0 || ApplicationStore.I.jobApplications.length > _itemsPerPage
-              ? _PaginationControls(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                ),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Job Applications',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    OutlinedButton.icon(
+                      onPressed: _openPostJobDialog,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Post Job'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF782B),
+                        side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: listHeight,
+                child: _JobApplicationsList(
                   currentPage: _currentPage,
-                  totalPages: (ApplicationStore.I.jobApplications.length / _itemsPerPage).ceil(),
-                  onPageChanged: (page) {
-                    setState(() => _currentPage = page);
-                  },
-                )
-              : const SizedBox.shrink(),
-        ],
-      ),
+                  itemsPerPage: _itemsPerPage,
+                  onDownload: _downloadResume,
+                  onDelete: _deleteApplication,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _currentPage > 0 || ApplicationStore.I.jobApplications.length > _itemsPerPage
+            ? _PaginationControls(
+                currentPage: _currentPage,
+                totalPages: (ApplicationStore.I.jobApplications.length / _itemsPerPage).ceil(),
+                onPageChanged: (page) {
+                  setState(() => _currentPage = page);
+                },
+              )
+            : const SizedBox.shrink(),
+      ],
     );
   }
 }
@@ -1718,78 +1734,94 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
     }
   }
 
+  Future<void> _openPostInternshipDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: const _PostInternshipFormInline(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: TabBar(
-                      labelColor: const Color(0xFFFF782B),
-                      unselectedLabelColor: Colors.black54,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      indicator: BoxDecoration(
-                        color: const Color(0xFFFF782B).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.5)),
-                      ),
-                      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                      tabs: const [
-                        Tab(text: 'Applications'),
-                        Tab(text: 'Post New Intern'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Builder(builder: (context) {
-                    double h = MediaQuery.of(context).size.height - 330;
-                    if (h < 320) h = 320;
-                    if (h > 900) h = 900;
-                    return SizedBox(
-                      height: h,
-                      child: TabBarView(
-                        children: [
-                          _InternshipApplicationsList(
-                            currentPage: _currentPage,
-                            itemsPerPage: _itemsPerPage,
-                            onDownload: _downloadResume,
-                            onDelete: _deleteApplication,
-                          ),
-                          const _PostInternshipFormInline(),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
+    double listHeight = MediaQuery.of(context).size.height - 360;
+    if (listHeight < 320) listHeight = 320;
+    if (listHeight > 900) listHeight = 900;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
               ),
-            ),
+            ],
           ),
-          _currentPage > 0 || ApplicationStore.I.internshipApplications.length > _itemsPerPage
-              ? _PaginationControls(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                ),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Internship Applications',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    OutlinedButton.icon(
+                      onPressed: _openPostInternshipDialog,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Post Internship'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF782B),
+                        side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: listHeight,
+                child: _InternshipApplicationsList(
                   currentPage: _currentPage,
-                  totalPages: (ApplicationStore.I.internshipApplications.length / _itemsPerPage).ceil(),
-                  onPageChanged: (page) {
-                    setState(() => _currentPage = page);
-                  },
-                )
-              : const SizedBox.shrink(),
-        ],
-      ),
+                  itemsPerPage: _itemsPerPage,
+                  onDownload: _downloadResume,
+                  onDelete: _deleteApplication,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _currentPage > 0 || ApplicationStore.I.internshipApplications.length > _itemsPerPage
+            ? _PaginationControls(
+                currentPage: _currentPage,
+                totalPages: (ApplicationStore.I.internshipApplications.length / _itemsPerPage).ceil(),
+                onPageChanged: (page) {
+                  setState(() => _currentPage = page);
+                },
+              )
+            : const SizedBox.shrink(),
+      ],
     );
   }
 }
@@ -3131,6 +3163,7 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
   final _postingDate = TextEditingController();
   final _applicationDeadline = TextEditingController();
   final _jobId = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _contractType = 'Full-Time';
 
   @override
@@ -3146,6 +3179,7 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
     _postingDate.dispose();
     _applicationDeadline.dispose();
     _jobId.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -3165,163 +3199,195 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                const Text('Post New Job', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 14),
-                const Text('Basic Details', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                LayoutBuilder(builder: (context, c) {
-                  final wide = c.maxWidth > 700;
-                  if (wide) {
-                    return Column(children: [
-                      Row(children: [
-                        Expanded(child: _buildField('Title', _title)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildField('Department', _department)),
-                      ]),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(child: _buildField('Location', _location, hint: 'City, Country')),
-                        const SizedBox(width: 12),
-                        Expanded(child: _dropdownContractType()),
-                      ]),
-                    ]);
-                  }
-                  return Column(children: [
-                    _buildField('Title', _title),
-                    const SizedBox(height: 12),
-                    _buildField('Department', _department),
-                    const SizedBox(height: 12),
-                    _buildField('Location', _location, hint: 'City, Country'),
-                    const SizedBox(height: 12),
-                    _dropdownContractType(),
-                  ]);
-                }),
-                const SizedBox(height: 16),
-                const Text('Qualifications & Experience', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                LayoutBuilder(builder: (context, c) {
-                  final wide = c.maxWidth > 700;
-                  if (wide) {
-                    return Column(children: [
-                      Row(children: [
-                        Expanded(child: _buildField('Experience', _experience, hint: 'e.g., 3-5 years')),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildField('Skills', _skills, hint: 'Comma-separated skills')),
-                      ]),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(child: _buildMultiline('Responsibilities', _responsibilities)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildMultiline('Qualifications', _qualifications)),
-                      ]),
-                    ]);
-                  }
-                  return Column(children: [
-                    _buildField('Experience', _experience, hint: 'e.g., 3-5 years'),
-                    const SizedBox(height: 12),
-                    _buildField('Skills', _skills, hint: 'Comma-separated skills'),
-                    const SizedBox(height: 12),
-                    _buildMultiline('Responsibilities', _responsibilities),
-                    const SizedBox(height: 12),
-                    _buildMultiline('Qualifications', _qualifications),
-                  ]);
-                }),
-                const SizedBox(height: 16),
-                const Text('Description', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                _buildMultiline('Description', _description),
-                const SizedBox(height: 16),
-                const Text('Timing & IDs', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                _dateRow(),
-                const SizedBox(height: 12),
-                _buildField('Job ID', _jobId, hint: 'Auto-filled, you can edit'),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 44,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        final job = JobPost(
-                          id: _jobId.text.trim(),
-                          title: _title.text.trim(),
-                          description: _description.text.trim(),
-                          location: _location.text.trim(),
-                          contractType: _contractType,
-                          department: _department.text.trim(),
-                          postingDate: _postingDate.text.trim(),
-                          applicationDeadline: _applicationDeadline.text.trim(),
-                          experience: _experience.text.trim(),
-                          skills: _splitList(_skills.text),
-                          responsibilities: _splitLines(_responsibilities.text),
-                          qualifications: _splitLines(_qualifications.text),
-                        );
-                        PostStore.I.addJob(job);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Job posted successfully')),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
-                    child: const Text('Submit Job', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Manage Jobs', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                AnimatedBuilder(
-                  animation: PostStore.I,
-                  builder: (context, _) {
-                    final items = PostStore.I.jobs;
-                    if (items.isEmpty) {
-                      return const Text('No active job posts yet.');
-                    }
-                    return ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const Divider(height: 12),
-                      itemBuilder: (context, index) {
-                        final j = items[index];
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+        child: Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          trackVisibility: true,
+          thickness: 8,
+          radius: const Radius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Post New Job', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 14),
+                    const Text('Basic Details', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    LayoutBuilder(
+                      builder: (context, c) {
+                        final wide = c.maxWidth > 700;
+                        if (wide) {
+                          return Column(
+                            children: [
+                              Row(
                                 children: [
-                                  Text(j.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  Text('${j.id} • ${j.postingDate}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                  Expanded(child: _buildField('Title', _title)),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _buildField('Department', _department)),
                                 ],
                               ),
-                            ),
-                            TextButton.icon(
-                              onPressed: () {
-                                final ok = PostStore.I.deleteJob(j.id);
-                                if (ok) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Job deleted')),
-                                  );
-                                }
-                              },
-                              style: TextButton.styleFrom(foregroundColor: Colors.red),
-                              icon: const Icon(Icons.delete_outline),
-                              label: const Text('Delete'),
-                            ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(child: _buildField('Location', _location, hint: 'City, Country')),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _dropdownContractType()),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+                        return Column(
+                          children: [
+                            _buildField('Title', _title),
+                            const SizedBox(height: 12),
+                            _buildField('Department', _department),
+                            const SizedBox(height: 12),
+                            _buildField('Location', _location, hint: 'City, Country'),
+                            const SizedBox(height: 12),
+                            _dropdownContractType(),
                           ],
                         );
                       },
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Qualifications & Experience', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    LayoutBuilder(
+                      builder: (context, c) {
+                        final wide = c.maxWidth > 700;
+                        if (wide) {
+                          return Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(child: _buildField('Experience', _experience, hint: 'e.g., 3-5 years')),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _buildField('Skills', _skills, hint: 'Comma-separated skills')),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(child: _buildMultiline('Responsibilities', _responsibilities)),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _buildMultiline('Qualifications', _qualifications)),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+                        return Column(
+                          children: [
+                            _buildField('Experience', _experience, hint: 'e.g., 3-5 years'),
+                            const SizedBox(height: 12),
+                            _buildField('Skills', _skills, hint: 'Comma-separated skills'),
+                            const SizedBox(height: 12),
+                            _buildMultiline('Responsibilities', _responsibilities),
+                            const SizedBox(height: 12),
+                            _buildMultiline('Qualifications', _qualifications),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Description', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    _buildMultiline('Description', _description),
+                    const SizedBox(height: 16),
+                    const Text('Timing & IDs', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    _dateRow(),
+                    const SizedBox(height: 12),
+                    _buildField('Job ID', _jobId, hint: 'Auto-filled, you can edit'),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (_formKey.currentState!.validate()) {
+                            final job = JobPost(
+                              id: _jobId.text.trim(),
+                              title: _title.text.trim(),
+                              description: _description.text.trim(),
+                              location: _location.text.trim(),
+                              contractType: _contractType,
+                              department: _department.text.trim(),
+                              postingDate: _postingDate.text.trim(),
+                              applicationDeadline: _applicationDeadline.text.trim(),
+                              experience: _experience.text.trim(),
+                              skills: _splitList(_skills.text),
+                              responsibilities: _splitLines(_responsibilities.text),
+                              qualifications: _splitLines(_qualifications.text),
+                            );
+                            PostStore.I.addJob(job);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Job posted successfully')),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF782B),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Submit Job', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text('Manage Jobs', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    AnimatedBuilder(
+                      animation: PostStore.I,
+                      builder: (context, _) {
+                        final items = PostStore.I.jobs;
+                        if (items.isEmpty) {
+                          return const Text('No active job posts yet.');
+                        }
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => const Divider(height: 12),
+                          itemBuilder: (context, index) {
+                            final j = items[index];
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(j.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      Text('${j.id} • ${j.postingDate}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                    ],
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    final ok = PostStore.I.deleteJob(j.id);
+                                    if (ok) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Job deleted')),
+                                      );
+                                    }
+                                  },
+                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  icon: const Icon(Icons.delete_outline),
+                                  label: const Text('Delete'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                ],
               ),
             ),
           ),
@@ -3455,6 +3521,7 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
   final _duration = TextEditingController();
   final _description = TextEditingController();
   final _postingDate = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   // Removed: Location, Contract Type, Internship ID as per requirements
 
   @override
@@ -3465,6 +3532,7 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
     _duration.dispose();
     _description.dispose();
     _postingDate.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -3481,127 +3549,149 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                const Text('Post New Internship', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 14),
-                const Text('Basic Details', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                LayoutBuilder(builder: (context, c) {
-                  final wide = c.maxWidth > 700;
-                  if (wide) {
-                    return Column(children: [
-                      Row(children: [
-                        Expanded(child: _buildField('Title', _title)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildField('Duration', _duration, hint: 'e.g., 3 months')),
-                      ]),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(child: _buildField('Skill', _skill, hint: 'Primary skill required')),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildField('Qualification', _qualification, hint: 'e.g., BSc, BTech')),
-                      ]),
-                    ]);
-                  }
-                  return Column(children: [
-                    _buildField('Title', _title),
-                    const SizedBox(height: 12),
-                    _buildField('Duration', _duration, hint: 'e.g., 3 months'),
-                    const SizedBox(height: 12),
-                    _buildField('Skill', _skill, hint: 'Primary skill required'),
-                    const SizedBox(height: 12),
-                    _buildField('Qualification', _qualification, hint: 'e.g., BSc, BTech'),
-                  ]);
-                }),
-                const SizedBox(height: 16),
-                const Text('Description', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                _buildMultiline('Description', _description),
-                const SizedBox(height: 12),
-                _buildDateField('Posting Date', _postingDate, allowPast: true),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 44,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        final genId = 'INT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-                        final post = InternshipPost(
-                          id: genId,
-                          title: _title.text.trim(),
-                          skill: _skill.text.trim(),
-                          qualification: _qualification.text.trim(),
-                          duration: _duration.text.trim(),
-                          description: _description.text.trim(),
-                          location: '',
-                          contractType: '',
-                          postingDate: _postingDate.text.trim(),
-                        );
-                        PostStore.I.addInternship(post);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Internship posted successfully')),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
-                    child: const Text('Submit Internship', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Manage Internships', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                AnimatedBuilder(
-                  animation: PostStore.I,
-                  builder: (context, _) {
-                    final items = PostStore.I.internships;
-                    if (items.isEmpty) {
-                      return const Text('No active internship posts yet.');
-                    }
-                    return ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const Divider(height: 12),
-                      itemBuilder: (context, index) {
-                        final it = items[index];
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+        child: Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          trackVisibility: true,
+          thickness: 8,
+          radius: const Radius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Post New Internship', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 14),
+                    const Text('Basic Details', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    LayoutBuilder(
+                      builder: (context, c) {
+                        final wide = c.maxWidth > 700;
+                        if (wide) {
+                          return Column(
+                            children: [
+                              Row(
                                 children: [
-                                  Text(it.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  Text('${it.id} • ${it.postingDate}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                  Expanded(child: _buildField('Title', _title)),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _buildField('Duration', _duration, hint: 'e.g., 3 months')),
                                 ],
                               ),
-                            ),
-                            TextButton.icon(
-                              onPressed: () {
-                                final ok = PostStore.I.deleteInternship(it.id);
-                                if (ok) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Internship deleted')),
-                                  );
-                                }
-                              },
-                              style: TextButton.styleFrom(foregroundColor: Colors.red),
-                              icon: const Icon(Icons.delete_outline),
-                              label: const Text('Delete'),
-                            ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(child: _buildField('Skill', _skill, hint: 'Primary skill required')),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _buildField('Qualification', _qualification, hint: 'e.g., BSc, BTech')),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+                        return Column(
+                          children: [
+                            _buildField('Title', _title),
+                            const SizedBox(height: 12),
+                            _buildField('Duration', _duration, hint: 'e.g., 3 months'),
+                            const SizedBox(height: 12),
+                            _buildField('Skill', _skill, hint: 'Primary skill required'),
+                            const SizedBox(height: 12),
+                            _buildField('Qualification', _qualification, hint: 'e.g., BSc, BTech'),
                           ],
                         );
                       },
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Description', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    _buildMultiline('Description', _description),
+                    const SizedBox(height: 12),
+                    _buildDateField('Posting Date', _postingDate, allowPast: true),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (_formKey.currentState!.validate()) {
+                            final genId = 'INT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+                            final post = InternshipPost(
+                              id: genId,
+                              title: _title.text.trim(),
+                              skill: _skill.text.trim(),
+                              qualification: _qualification.text.trim(),
+                              duration: _duration.text.trim(),
+                              description: _description.text.trim(),
+                              location: '',
+                              contractType: '',
+                              postingDate: _postingDate.text.trim(),
+                            );
+                            PostStore.I.addInternship(post);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Internship posted successfully')),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF782B),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Submit Internship', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text('Manage Internships', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    AnimatedBuilder(
+                      animation: PostStore.I,
+                      builder: (context, _) {
+                        final items = PostStore.I.internships;
+                        if (items.isEmpty) {
+                          return const Text('No active internship posts yet.');
+                        }
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => const Divider(height: 12),
+                          itemBuilder: (context, index) {
+                            final it = items[index];
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(it.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      Text('${it.id} • ${it.postingDate}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                    ],
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    final ok = PostStore.I.deleteInternship(it.id);
+                                    if (ok) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Internship deleted')),
+                                      );
+                                    }
+                                  },
+                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  icon: const Icon(Icons.delete_outline),
+                                  label: const Text('Delete'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                ],
               ),
             ),
           ),

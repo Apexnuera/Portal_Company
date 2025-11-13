@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../state/app_session.dart';
 import '../state/employee_directory.dart';
 import '../services/faq_service.dart';
 import '../widgets/timesheet_content.dart';
@@ -1275,7 +1278,9 @@ class _EmployeeTopHeader extends StatelessWidget {
           const SizedBox(width: 12),
           TextButton.icon(
             onPressed: () {
-              Navigator.of(context).pushReplacementNamed('/login/employee');
+              AuthService.instance.setEmployeeLoggedIn(false);
+              context.read<AppSession>().signOut();
+              context.go('/login/employee');
             },
             icon: const Icon(Icons.logout, size: 18),
             label: const Text('Logout'),
