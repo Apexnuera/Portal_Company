@@ -29,8 +29,14 @@ import 'services/faq_service.dart';
 import 'state/app_session.dart';
 import 'state/employee_directory.dart';
 import 'services/alert_service.dart';
+import 'config/supabase_config.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Supabase before running the app
+  await SupabaseConfig.initialize();
+  
   runApp(const MyApp());
 }
 

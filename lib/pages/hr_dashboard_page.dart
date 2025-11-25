@@ -5,12 +5,14 @@ import 'package:provider/provider.dart';
 import '../data/post_store.dart';
 import '../data/support_store.dart';
 import '../data/application_store.dart';
+import '../widgets/app_header_clean.dart';
+import '../services/alert_service.dart';
 import '../state/employee_directory.dart';
 import 'hr_employee_portal_page.dart';
-import '../services/alert_service.dart';
 import '../utils/document_picker.dart';
 import '../utils/document_viewer.dart';
 import '../utils/document_saver.dart';
+import '../services/employee_management_service.dart';
 
 enum _HRMenu { overview, queries, alerts, postJob, postInternship, employeeDetails, companyDrive }
 
@@ -1016,6 +1018,7 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isCreating = false;
 
   @override
   void dispose() {
@@ -1026,20 +1029,53 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
     super.dispose();
   }
 
-  void _createEmployee() {
-    if (_formKey.currentState?.validate() ?? false) {
+  Future<void> _createEmployee() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _isCreating = true);
+
+    final employeeId = _employeeIdController.text.trim();
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    // Create employee via Supabase
+    final error = await EmployeeManagementService.instance.createEmployee(
+      employeeId: employeeId,
+      name: name,
+      email: email,
+      password: password,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _isCreating = false);
+
+    if (error == null) {
+      // Success - also add to local state for immediate UI update
       final record = _EmployeeRecord(
-        id: _employeeIdController.text.trim(),
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        id: employeeId,
+        name: name,
+        email: email,
+        password: password,
         profile: _EmployeeProfileData.empty(),
       );
       widget.onCreate(record);
+      
+      // Clear form
       _nameController.clear();
       _emailController.clear();
       _passwordController.clear();
       _employeeIdController.clear();
+    } else {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -1143,9 +1179,21 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _createEmployee,
-                icon: const Icon(Icons.person_add_alt_1_outlined),
-                label: const Text('Create Employee', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                onPressed: _isCreating ? null : _createEmployee,
+                icon: _isCreating
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.person_add_alt_1_outlined),
+                label: Text(
+                  _isCreating ? 'Creating...' : 'Create Employee',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF782B),
                   foregroundColor: Colors.white,

@@ -16,6 +16,7 @@ class _HRLoginPageState extends State<HRLoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -106,19 +107,48 @@ class _HRLoginPageState extends State<HRLoginPage> {
                                 SizedBox(
                                   height: 44,
                                   child: ElevatedButton(
-                                    onPressed: () {
-                                      if (_formKey.currentState!.validate()) {
-                                        // Placeholder auth success
-                                        AuthService.instance.setHRLoggedIn(true);
-                                        context.go('/hr/dashboard');
-                                      }
-                                    },
+                                    onPressed: _isLoading
+                                        ? null
+                                        : () async {
+                                            if (_formKey.currentState!.validate()) {
+                                              setState(() => _isLoading = true);
+                                              
+                                              final error = await AuthService.instance.signInWithEmail(
+                                                _emailController.text.trim(),
+                                                _passwordController.text.trim(),
+                                                isHR: true,
+                                              );
+
+                                              if (!mounted) return;
+                                              setState(() => _isLoading = false);
+
+                                              if (error == null) {
+                                                context.go('/hr/dashboard');
+                                              } else {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(error),
+                                                    backgroundColor: Colors.red,
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFFFF782B),
                                       foregroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
-                                    child: const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            ),
+                                          )
+                                        : const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
                                 ),
                                 const SizedBox(height: 10),

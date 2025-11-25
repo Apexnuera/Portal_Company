@@ -18,12 +18,44 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final error = await AuthService.instance.signInWithEmail(
+      _emailController.text.trim(),
+      _passwordController.text,
+      isHR: false,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    if (error == null) {
+      // Success - update app session and navigate
+      final appSession = context.read<AppSession>();
+      appSession.signIn(_emailController.text.trim());
+      context.go('/employee/dashboard');
+    } else {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -117,28 +149,22 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                           SizedBox(
                             height: 44,
                             child: ElevatedButton(
-                              onPressed: () {
-                                if (_formKey.currentState!.validate()) {
-                                  // Simulate login process
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Logging in...')),
-                                  );
-                                  
-                                  // Set employee as logged in and navigate to employee dashboard
-                                  AuthService.instance.setEmployeeLoggedIn(true);
-
-                                  final appSession = context.read<AppSession>();
-                                  appSession.signIn(_emailController.text.trim());
-
-                                  context.go('/employee/dashboard');
-                                }
-                              },
+                              onPressed: _isLoading ? null : _handleLogin,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFF782B),
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              child: const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                           const SizedBox(height: 10),
