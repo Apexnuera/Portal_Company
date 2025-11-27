@@ -19,9 +19,61 @@ class AuthService extends ChangeNotifier {
   /// Check if user is authenticated
   bool get isAuthenticated => _currentUser != null;
 
+  /// Initialize auth service and restore session
+  Future<void> initialize() async {
+    final session = SupabaseConfig.client.auth.currentSession;
+    if (session != null) {
+      _currentUser = session.user;
+      debugPrint('Restoring session for user: ${_currentUser?.id}');
+
+      // Fetch role
+      await _fetchUserRole(_currentUser!.id);
+
+      // Set login flags based on role
+      if (_userRole == 'hr') {
+        _isHRLoggedIn = true;
+      } else if (_userRole == 'employee') {
+        _isEmployeeLoggedIn = true;
+      }
+
+      notifyListeners();
+    }
+
+    // Listen for auth state changes
+    SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      final Session? session = data.session;
+
+      if (event == AuthChangeEvent.signedOut) {
+        _currentUser = null;
+        _userRole = null;
+        _isHRLoggedIn = false;
+        _isEmployeeLoggedIn = false;
+        notifyListeners();
+      } else if (event == AuthChangeEvent.signedIn && session != null) {
+        // Handle explicit sign in if needed, though usually handled by signInWithEmail
+        if (_currentUser == null) {
+          _currentUser = session.user;
+          _fetchUserRole(_currentUser!.id).then((_) {
+            if (_userRole == 'hr') {
+              _isHRLoggedIn = true;
+            } else if (_userRole == 'employee') {
+              _isEmployeeLoggedIn = true;
+            }
+            notifyListeners();
+          });
+        }
+      }
+    });
+  }
+
   /// Sign in with email and password
   /// Returns error message if login fails, null if successful
-  Future<String?> signInWithEmail(String email, String password, {required bool isHR}) async {
+  Future<String?> signInWithEmail(
+    String email,
+    String password, {
+    required bool isHR,
+  }) async {
     try {
       final response = await SupabaseConfig.client.auth.signInWithPassword(
         email: email,
@@ -30,32 +82,32 @@ class AuthService extends ChangeNotifier {
 
       if (response.user != null) {
         _currentUser = response.user;
-        
+
         // Fetch user role from database
         await _fetchUserRole(response.user!.id);
-        
+
         // Verify role matches expected role
         if (isHR && _userRole != 'hr') {
           await signOut();
           return 'Access denied. This account is not authorized for HR access.';
         }
-        
+
         if (!isHR && _userRole != 'employee') {
           await signOut();
           return 'Access denied. This account is not authorized for employee access.';
         }
-        
+
         // Set appropriate login flag
         if (isHR) {
           _isHRLoggedIn = true;
         } else {
           _isEmployeeLoggedIn = true;
         }
-        
+
         notifyListeners();
         return null; // Success
       }
-      
+
       return 'Login failed. Please try again.';
     } on AuthException catch (e) {
       return e.message;
@@ -73,7 +125,7 @@ class AuthService extends ChangeNotifier {
           .select('role')
           .eq('id', userId)
           .single();
-      
+
       debugPrint('Role fetch response: $response');
       _userRole = response['role'] as String?;
       debugPrint('Assigned role: $_userRole');

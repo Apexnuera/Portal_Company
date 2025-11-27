@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:company_portal/services/supabase_hr_store.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/post_store.dart';
@@ -4063,31 +4064,47 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                     SizedBox(
                       height: 44,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           if (_formKey.currentState!.validate()) {
-                            final job = JobPost(
-                              id: _jobId.text.trim(),
-                              title: _title.text.trim(),
-                              description: _description.text.trim(),
-                              location: _location.text.trim(),
-                              contractType: _contractType,
-                              department: _department.text.trim(),
-                              postingDate: _postingDate.text.trim(),
-                              applicationDeadline: _applicationDeadline.text
-                                  .trim(),
-                              experience: _experience.text.trim(),
-                              skills: _splitList(_skills.text),
-                              responsibilities: _splitLines(
-                                _responsibilities.text,
-                              ),
-                              qualifications: _splitLines(_qualifications.text),
-                            );
-                            PostStore.I.addJob(job);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Job posted successfully'),
-                              ),
-                            );
+                            final success = await SupabaseHRStore.instance
+                                .createJob(
+                                  id: _jobId.text.trim(),
+                                  title: _title.text.trim(),
+                                  location: _location.text.trim(),
+                                  contractType: _contractType,
+                                  department: _department.text.trim(),
+                                  postingDate: _postingDate.text.trim(),
+                                  applicationDeadline: _applicationDeadline.text
+                                      .trim(),
+                                  experience: _experience.text.trim(),
+                                  skills: _splitList(_skills.text),
+                                  responsibilities: _splitLines(
+                                    _responsibilities.text,
+                                  ),
+                                  qualifications: _splitLines(
+                                    _qualifications.text,
+                                  ),
+                                  description: _description.text.trim(),
+                                );
+
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Job posted successfully'),
+                                ),
+                              );
+                              // Clear form
+                              _formKey.currentState!.reset();
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Failed to post job. Please try again.',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -4109,10 +4126,17 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    AnimatedBuilder(
-                      animation: PostStore.I,
-                      builder: (context, _) {
-                        final items = PostStore.I.jobs;
+                    Consumer<SupabaseHRStore>(
+                      builder: (context, store, _) {
+                        final items = store.jobs;
+                        if (store.isLoading) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
                         if (items.isEmpty) {
                           return const Text('No active job posts yet.');
                         }
@@ -4132,13 +4156,13 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        j.title,
+                                        j['title'] ?? '',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                       Text(
-                                        '${j.id} • ${j.postingDate}',
+                                        '${j['id']} • ${j['posting_date']}',
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: Colors.black54,
@@ -4148,9 +4172,9 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                                   ),
                                 ),
                                 TextButton.icon(
-                                  onPressed: () {
-                                    final ok = PostStore.I.deleteJob(j.id);
-                                    if (ok) {
+                                  onPressed: () async {
+                                    final ok = await store.deleteJob(j['id']);
+                                    if (ok && context.mounted) {
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
@@ -4476,27 +4500,41 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                     SizedBox(
                       height: 44,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           if (_formKey.currentState!.validate()) {
                             final genId =
                                 'INT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-                            final post = InternshipPost(
-                              id: genId,
-                              title: _title.text.trim(),
-                              skill: _skill.text.trim(),
-                              qualification: _qualification.text.trim(),
-                              duration: _duration.text.trim(),
-                              description: _description.text.trim(),
-                              location: '',
-                              contractType: '',
-                              postingDate: _postingDate.text.trim(),
-                            );
-                            PostStore.I.addInternship(post);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Internship posted successfully'),
-                              ),
-                            );
+                            final success = await SupabaseHRStore.instance
+                                .createInternship(
+                                  id: genId,
+                                  title: _title.text.trim(),
+                                  skill: _skill.text.trim(),
+                                  qualification: _qualification.text.trim(),
+                                  duration: _duration.text.trim(),
+                                  description: _description.text.trim(),
+                                  postingDate: _postingDate.text.trim(),
+                                );
+
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Internship posted successfully',
+                                  ),
+                                ),
+                              );
+                              // Clear form
+                              _formKey.currentState!.reset();
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Failed to post internship. Please try again.',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -4518,10 +4556,17 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    AnimatedBuilder(
-                      animation: PostStore.I,
-                      builder: (context, _) {
-                        final items = PostStore.I.internships;
+                    Consumer<SupabaseHRStore>(
+                      builder: (context, store, _) {
+                        final items = store.internships;
+                        if (store.isLoading) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
                         if (items.isEmpty) {
                           return const Text('No active internship posts yet.');
                         }
@@ -4532,7 +4577,7 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                           separatorBuilder: (_, __) =>
                               const Divider(height: 12),
                           itemBuilder: (context, index) {
-                            final it = items[index];
+                            final i = items[index];
                             return Row(
                               children: [
                                 Expanded(
@@ -4541,13 +4586,13 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        it.title,
+                                        i['title'] ?? '',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                       Text(
-                                        '${it.id} • ${it.postingDate}',
+                                        '${i['id']} • ${i['posting_date']}',
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: Colors.black54,
@@ -4557,11 +4602,11 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                                   ),
                                 ),
                                 TextButton.icon(
-                                  onPressed: () {
-                                    final ok = PostStore.I.deleteInternship(
-                                      it.id,
+                                  onPressed: () async {
+                                    final ok = await store.deleteInternship(
+                                      i['id'],
                                     );
-                                    if (ok) {
+                                    if (ok && context.mounted) {
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(

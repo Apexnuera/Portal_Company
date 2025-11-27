@@ -1,3 +1,4 @@
+import 'package:company_portal/services/supabase_hr_store.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -33,10 +34,15 @@ import 'config/supabase_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Supabase before running the app
   await SupabaseConfig.initialize();
-  
+
+  // Initialize Auth Service (restore session)
+  await AuthService.instance.initialize();
+
+  SupabaseHRStore.instance.initialize();
+
   runApp(const MyApp());
 }
 
@@ -67,11 +73,23 @@ class MyApp extends StatelessWidget {
         GoRoute(path: '/', redirect: (_, __) => '/home'),
         GoRoute(path: '/home', builder: (_, __) => const HomePage()),
         GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
-        GoRoute(path: '/login/employee', builder: (_, __) => const EmployeeLoginPage()),
+        GoRoute(
+          path: '/login/employee',
+          builder: (_, __) => const EmployeeLoginPage(),
+        ),
         GoRoute(path: '/login/hr', builder: (_, __) => const HRLoginPage()),
-        GoRoute(path: '/login/otp-method', builder: (_, __) => const OTPMethodLoginPage()),
-        GoRoute(path: '/change-password', builder: (_, __) => const ChangePasswordPage()),
-        GoRoute(path: '/campus-commune', builder: (_, __) => const CampusCommunePage()),
+        GoRoute(
+          path: '/login/otp-method',
+          builder: (_, __) => const OTPMethodLoginPage(),
+        ),
+        GoRoute(
+          path: '/change-password',
+          builder: (_, __) => const ChangePasswordPage(),
+        ),
+        GoRoute(
+          path: '/campus-commune',
+          builder: (_, __) => const CampusCommunePage(),
+        ),
         GoRoute(
           path: '/help-support',
           builder: (_, state) => HelpSupportPage(
@@ -81,28 +99,45 @@ class MyApp extends StatelessWidget {
         GoRoute(path: '/jobs', builder: (_, __) => const JobsListingPage()),
         GoRoute(
           path: '/jobs/:jobId',
-          builder: (_, state) => JobDetailsPage(jobId: state.pathParameters['jobId']!),
+          builder: (_, state) =>
+              JobDetailsPage(jobId: state.pathParameters['jobId']!),
         ),
         GoRoute(
           path: '/jobs/apply/:jobId',
-          builder: (_, state) => JobApplicationFormPage(jobId: state.pathParameters['jobId']!),
+          builder: (_, state) =>
+              JobApplicationFormPage(jobId: state.pathParameters['jobId']!),
         ),
         GoRoute(
           path: '/jobs/apply/:jobId/success',
-          builder: (_, state) => JobApplicationSuccessPage(jobId: state.pathParameters['jobId']!),
+          builder: (_, state) =>
+              JobApplicationSuccessPage(jobId: state.pathParameters['jobId']!),
         ),
-        GoRoute(path: '/internships', builder: (_, __) => const InternshipsListingPage()),
+        GoRoute(
+          path: '/internships',
+          builder: (_, __) => const InternshipsListingPage(),
+        ),
         GoRoute(
           path: '/internships/:internshipId',
-          builder: (_, state) => InternshipDetailsPage(internshipId: state.pathParameters['internshipId']!),
+          builder: (_, state) => InternshipDetailsPage(
+            internshipId: state.pathParameters['internshipId']!,
+          ),
         ),
-        GoRoute(path: '/register/employee', builder: (_, __) => const EmployeeRegistrationPage()),
+        GoRoute(
+          path: '/register/employee',
+          builder: (_, __) => const EmployeeRegistrationPage(),
+        ),
         // Employee routes (protected by redirect)
-        GoRoute(path: '/employee/dashboard', builder: (_, __) => EmployeeDashboardPage()),
+        GoRoute(
+          path: '/employee/dashboard',
+          builder: (_, __) => EmployeeDashboardPage(),
+        ),
         // HR routes (protected by redirect)
         GoRoute(path: '/hr/dashboard', builder: (_, __) => HRDashboardPage()),
         GoRoute(path: '/hr/post/job', builder: (_, __) => HRPostJobPage()),
-        GoRoute(path: '/hr/post/internship', builder: (_, __) => HRPostInternshipPage()),
+        GoRoute(
+          path: '/hr/post/internship',
+          builder: (_, __) => HRPostInternshipPage(),
+        ),
         // Optional legacy/placeholder routes
         GoRoute(path: '/alerts', builder: (_, __) => const AlertsPage()),
         GoRoute(path: '/buzz', builder: (_, __) => const BuzzPage()),
@@ -111,15 +146,11 @@ class MyApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<AppSession>(
-          create: (_) => AppSession(),
-        ),
+        ChangeNotifierProvider<AppSession>(create: (_) => AppSession()),
         ChangeNotifierProvider<EmployeeDirectory>(
           create: (_) => EmployeeDirectory(),
         ),
-        ChangeNotifierProvider<AlertService>(
-          create: (_) => AlertService(),
-        ),
+        ChangeNotifierProvider<AlertService>(create: (_) => AlertService()),
         ChangeNotifierProvider<TimeSheetService>(
           create: (_) => TimeSheetService.instance..initialize(),
         ),
@@ -128,6 +159,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<FaqService>(
           create: (_) => FaqService.instance..initialize(),
+        ),
+        ChangeNotifierProvider<SupabaseHRStore>.value(
+          value: SupabaseHRStore.instance,
         ),
       ],
       child: MaterialApp.router(
