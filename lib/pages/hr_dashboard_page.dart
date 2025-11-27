@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../data/post_store.dart';
 import '../data/support_store.dart';
 import '../data/application_store.dart';
-import '../widgets/app_header_clean.dart';
 import '../services/alert_service.dart';
 import '../state/employee_directory.dart';
 import 'hr_employee_portal_page.dart';
@@ -14,7 +13,15 @@ import '../utils/document_viewer.dart';
 import '../utils/document_saver.dart';
 import '../services/employee_management_service.dart';
 
-enum _HRMenu { overview, queries, alerts, postJob, postInternship, employeeDetails, companyDrive }
+enum _HRMenu {
+  overview,
+  queries,
+  alerts,
+  postJob,
+  postInternship,
+  employeeDetails,
+  companyDrive,
+}
 
 // ========================= COMPANY DRIVE =========================
 class _DriveEntry {
@@ -28,18 +35,22 @@ class _DriveEntry {
   String? mimeType; // for files
 
   _DriveEntry.folder({required this.name, this.parent})
-      : id = UniqueKey().toString(),
-        isFolder = true,
-        createdAt = DateTime.now(),
-        children = <_DriveEntry>[],
-        data = null,
-        mimeType = null;
+    : id = UniqueKey().toString(),
+      isFolder = true,
+      createdAt = DateTime.now(),
+      children = <_DriveEntry>[],
+      data = null,
+      mimeType = null;
 
-  _DriveEntry.file({required this.name, required this.data, required this.mimeType, this.parent})
-      : id = UniqueKey().toString(),
-        isFolder = false,
-        createdAt = DateTime.now(),
-        children = <_DriveEntry>[];
+  _DriveEntry.file({
+    required this.name,
+    required this.data,
+    required this.mimeType,
+    this.parent,
+  }) : id = UniqueKey().toString(),
+       isFolder = false,
+       createdAt = DateTime.now(),
+       children = <_DriveEntry>[];
 }
 
 class _CompanyDriveState extends ChangeNotifier {
@@ -79,8 +90,17 @@ class _CompanyDriveState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void uploadFile({required String name, required Uint8List data, String? mimeType}) {
-    final entry = _DriveEntry.file(name: name, data: data, mimeType: mimeType ?? 'application/octet-stream', parent: current);
+  void uploadFile({
+    required String name,
+    required Uint8List data,
+    String? mimeType,
+  }) {
+    final entry = _DriveEntry.file(
+      name: name,
+      data: data,
+      mimeType: mimeType ?? 'application/octet-stream',
+      parent: current,
+    );
     current.children.add(entry);
     notifyListeners();
   }
@@ -111,6 +131,7 @@ class _CompanyDriveState extends ChangeNotifier {
         }
       }
     }
+
     dfs(root);
     return all;
   }
@@ -141,7 +162,8 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
   IconData _iconFor(_DriveEntry e) {
     if (e.isFolder) return Icons.folder;
     final ext = e.name.split('.').last.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext)) return Icons.image_outlined;
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext))
+      return Icons.image_outlined;
     if (['pdf'].contains(ext)) return Icons.picture_as_pdf_outlined;
     if (['doc', 'docx', 'rtf'].contains(ext)) return Icons.description_outlined;
     if (['txt', 'md'].contains(ext)) return Icons.article_outlined;
@@ -152,9 +174,9 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
     final doc = await pickDocument(context);
     if (!mounted || doc == null) return;
     _state.uploadFile(name: doc.name, data: doc.data, mimeType: doc.type);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Uploaded ${doc.name}')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Uploaded ${doc.name}')));
   }
 
   Future<void> _onNewFolder() async {
@@ -169,10 +191,16 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
           decoration: const InputDecoration(hintText: 'Folder name'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF782B),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Create'),
           ),
         ],
@@ -181,7 +209,9 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
     if (!mounted) return;
     if (name != null && name.isNotEmpty) {
       _state.createFolder(name);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Folder "$name" created')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Folder "$name" created')));
     }
   }
 
@@ -197,10 +227,16 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
           decoration: const InputDecoration(hintText: 'New name'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF782B),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Save'),
           ),
         ],
@@ -223,10 +259,16 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
           'Are you sure you want to delete "${entry.name}"${isFolder ? ' and its $childCount item(s)?' : '?'}',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -238,22 +280,32 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
 
   Future<void> _download(_DriveEntry entry) async {
     if (entry.isFolder || entry.data == null) return;
-    final saved = await saveDocumentBytes(bytes: entry.data!, fileName: entry.name);
+    final saved = await saveDocumentBytes(
+      bytes: entry.data!,
+      fileName: entry.name,
+    );
     if (!mounted) return;
     if (!saved) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Download not supported on this platform.')),
+        const SnackBar(
+          content: Text('Download not supported on this platform.'),
+        ),
       );
     }
   }
 
   Future<void> _openFile(_DriveEntry entry) async {
     if (entry.isFolder || entry.data == null) return;
-    final opened = await openDocumentBytes(bytes: entry.data!, fileName: entry.name);
+    final opened = await openDocumentBytes(
+      bytes: entry.data!,
+      fileName: entry.name,
+    );
     if (!mounted) return;
     if (!opened) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preview not supported on this platform.')),
+        const SnackBar(
+          content: Text('Preview not supported on this platform.'),
+        ),
       );
     }
   }
@@ -293,9 +345,18 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.cloud_outlined, color: Color(0xFFFF782B)),
+                      const Icon(
+                        Icons.cloud_outlined,
+                        color: Color(0xFFFF782B),
+                      ),
                       const SizedBox(width: 8),
-                      const Text('Company Drive', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const Text(
+                        'Company Drive',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const Spacer(),
                       SizedBox(
                         width: 300,
@@ -306,7 +367,9 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                             isDense: true,
                             prefixIcon: const Icon(Icons.search),
                             hintText: 'Search files and folders',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
                       ),
@@ -321,7 +384,10 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                         onPressed: _onUpload,
                         icon: const Icon(Icons.upload_file_outlined),
                         label: const Text('Upload'),
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF782B),
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ],
                   ),
@@ -336,9 +402,19 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                             onTap: () => _state.upTo(i),
                             child: Row(
                               children: [
-                                if (i == 0) const Icon(Icons.home_outlined, size: 18, color: Color(0xFFFF782B)),
+                                if (i == 0)
+                                  const Icon(
+                                    Icons.home_outlined,
+                                    size: 18,
+                                    color: Color(0xFFFF782B),
+                                  ),
                                 if (i == 0) const SizedBox(width: 4),
-                                Text(_state.path[i].name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                Text(
+                                  _state.path[i].name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -347,7 +423,7 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                             const Icon(Icons.chevron_right, size: 18),
                             const SizedBox(width: 8),
                           ],
-                        ]
+                        ],
                       ],
                     ),
                   ),
@@ -368,9 +444,18 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.folder_open, size: 48, color: Colors.grey.shade300),
+                            Icon(
+                              Icons.folder_open,
+                              size: 48,
+                              color: Colors.grey.shade300,
+                            ),
                             const SizedBox(height: 6),
-                            Text(_state.query.isEmpty ? 'This folder is empty' : 'No results found', style: TextStyle(color: Colors.grey.shade600)),
+                            Text(
+                              _state.query.isEmpty
+                                  ? 'This folder is empty'
+                                  : 'No results found',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
                           ],
                         ),
                       ),
@@ -383,11 +468,19 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade50,
-                            border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                            border: Border(
+                              bottom: BorderSide(color: Colors.grey.shade300),
+                            ),
                           ),
                           child: Row(
                             children: const [
-                              Expanded(flex: 6, child: Text('Name', style: TextStyle(fontWeight: FontWeight.w700))),
+                              Expanded(
+                                flex: 6,
+                                child: Text(
+                                  'Name',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
                               Expanded(flex: 2, child: Text('Owner')),
                               Expanded(flex: 3, child: Text('Date modified')),
                               Expanded(flex: 2, child: Text('File size')),
@@ -399,13 +492,17 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: items.length,
-                          separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade300),
+                          separatorBuilder: (_, __) =>
+                              Divider(height: 1, color: Colors.grey.shade300),
                           itemBuilder: (context, index) {
                             final e = items[index];
                             final isFolder = e.isFolder;
-                            final sizeText = isFolder ? '—' : _formatSize(e.data?.length ?? 0);
+                            final sizeText = isFolder
+                                ? '—'
+                                : _formatSize(e.data?.length ?? 0);
                             final date = e.createdAt;
-                            final dateText = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                            final dateText =
+                                '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
                             return InkWell(
                               onDoubleTap: () {
                                 if (isFolder) {
@@ -416,7 +513,9 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                               },
                               child: Container(
                                 height: 48,
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
                                 child: Row(
                                   children: [
                                     // Name
@@ -424,10 +523,19 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                                       flex: 6,
                                       child: Row(
                                         children: [
-                                          Icon(_iconFor(e), color: isFolder ? Colors.grey.shade700 : const Color(0xFFFF782B)),
+                                          Icon(
+                                            _iconFor(e),
+                                            color: isFolder
+                                                ? Colors.grey.shade700
+                                                : const Color(0xFFFF782B),
+                                          ),
                                           const SizedBox(width: 10),
                                           Expanded(
-                                            child: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                            child: Text(
+                                              e.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -464,13 +572,50 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                                       },
                                       itemBuilder: (ctx) => [
                                         if (isFolder)
-                                          const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.folder_open), title: Text('Open'))),
+                                          const PopupMenuItem(
+                                            value: 'open',
+                                            child: ListTile(
+                                              leading: Icon(Icons.folder_open),
+                                              title: Text('Open'),
+                                            ),
+                                          ),
                                         if (!isFolder)
-                                          const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.open_in_new), title: Text('Open'))),
+                                          const PopupMenuItem(
+                                            value: 'open',
+                                            child: ListTile(
+                                              leading: Icon(Icons.open_in_new),
+                                              title: Text('Open'),
+                                            ),
+                                          ),
                                         if (!isFolder)
-                                          const PopupMenuItem(value: 'download', child: ListTile(leading: Icon(Icons.download_outlined), title: Text('Download'))),
-                                        const PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.drive_file_rename_outline), title: Text('Rename'))),
-                                        const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline, color: Colors.red), title: Text('Delete'))),
+                                          const PopupMenuItem(
+                                            value: 'download',
+                                            child: ListTile(
+                                              leading: Icon(
+                                                Icons.download_outlined,
+                                              ),
+                                              title: Text('Download'),
+                                            ),
+                                          ),
+                                        const PopupMenuItem(
+                                          value: 'rename',
+                                          child: ListTile(
+                                            leading: Icon(
+                                              Icons.drive_file_rename_outline,
+                                            ),
+                                            title: Text('Rename'),
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: ListTile(
+                                            leading: Icon(
+                                              Icons.delete_outline,
+                                              color: Colors.red,
+                                            ),
+                                            title: Text('Delete'),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ],
@@ -519,7 +664,14 @@ class _AlertsModuleState extends State<_AlertsModule> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Alerts', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87)),
+          const Text(
+            'Alerts',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
@@ -534,15 +686,22 @@ class _AlertsModuleState extends State<_AlertsModule> {
               children: [
                 const Text(
                   'Emergency Alert Message',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: _controller,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    hintText: 'Enter alert message to broadcast to all employees...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    hintText:
+                        'Enter alert message to broadcast to all employees...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -558,7 +717,10 @@ class _AlertsModuleState extends State<_AlertsModule> {
                       },
                       icon: const Icon(Icons.add_alert_outlined),
                       label: const Text('Add Alert'),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B), foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF782B),
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
@@ -566,7 +728,11 @@ class _AlertsModuleState extends State<_AlertsModule> {
                           ? null
                           : () {
                               context.read<AlertService>().clearAll();
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All alerts cleared')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('All alerts cleared'),
+                                ),
+                              );
                             },
                       icon: const Icon(Icons.delete_sweep_outlined),
                       label: const Text('Clear All'),
@@ -592,37 +758,51 @@ class _AlertsModuleState extends State<_AlertsModule> {
                   children: const [
                     Icon(Icons.list_alt_outlined, color: Color(0xFFFF782B)),
                     SizedBox(width: 8),
-                    Text('Alerts List', style: TextStyle(fontWeight: FontWeight.w700)),
+                    Text(
+                      'Alerts List',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 if (alerts.isEmpty)
-                  Text('No alerts', style: TextStyle(color: Colors.grey.shade700))
+                  Text(
+                    'No alerts',
+                    style: TextStyle(color: Colors.grey.shade700),
+                  )
                 else
-                  ...alerts.map((a) => Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(child: Text(a.text)),
-                            Switch(
-                              value: a.active,
-                              activeThumbColor: const Color(0xFFFF782B),
-                              onChanged: (v) => context.read<AlertService>().toggleActive(a.id, v),
+                  ...alerts.map(
+                    (a) => Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(a.text)),
+                          Switch(
+                            value: a.active,
+                            activeThumbColor: const Color(0xFFFF782B),
+                            onChanged: (v) => context
+                                .read<AlertService>()
+                                .toggleActive(a.id, v),
+                          ),
+                          IconButton(
+                            tooltip: 'Delete',
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
                             ),
-                            IconButton(
-                              tooltip: 'Delete',
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              onPressed: () => context.read<AlertService>().remove(a.id),
-                            ),
-                          ],
-                        ),
-                      )),
+                            onPressed: () =>
+                                context.read<AlertService>().remove(a.id),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -770,16 +950,30 @@ class _EmployeeProfileData {
       personalEmail: personalEmail,
       alternatePhone: alternatePhone,
       address: address,
-      dateOfBirth: dateOfBirth != null ? DateTime.fromMillisecondsSinceEpoch(dateOfBirth!.millisecondsSinceEpoch) : null,
+      dateOfBirth: dateOfBirth != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              dateOfBirth!.millisecondsSinceEpoch,
+            )
+          : null,
       bloodGroup: bloodGroup,
-      profileImageBytes: profileImageBytes != null ? Uint8List.fromList(profileImageBytes!) : null,
+      profileImageBytes: profileImageBytes != null
+          ? Uint8List.fromList(profileImageBytes!)
+          : null,
       designation: designation,
       department: department,
       managerName: managerName,
       employmentType: employmentType,
       workLocation: workLocation,
-      startDate: startDate != null ? DateTime.fromMillisecondsSinceEpoch(startDate!.millisecondsSinceEpoch) : null,
-      confirmationDate: confirmationDate != null ? DateTime.fromMillisecondsSinceEpoch(confirmationDate!.millisecondsSinceEpoch) : null,
+      startDate: startDate != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              startDate!.millisecondsSinceEpoch,
+            )
+          : null,
+      confirmationDate: confirmationDate != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              confirmationDate!.millisecondsSinceEpoch,
+            )
+          : null,
       skills: List<String>.from(skills),
       baseSalary: baseSalary,
       bonus: bonus,
@@ -854,17 +1048,27 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                      border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
+                      border: Border(
+                        bottom: BorderSide(color: Colors.grey.shade300),
+                      ),
                     ),
                     child: Row(
                       children: [
                         const Text(
                           'Employee List',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         const Spacer(),
                         ElevatedButton.icon(
@@ -873,9 +1077,13 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                               context: context,
                               builder: (dialogCtx) {
                                 return Dialog(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
                                   child: ConstrainedBox(
-                                    constraints: const BoxConstraints(maxWidth: 720),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 720,
+                                    ),
                                     child: _CreateEmployeeForm(
                                       onCreate: (record) {
                                         _data.addEmployee(record);
@@ -900,24 +1108,33 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                                             profileImageBytes: null,
                                             assignedAssets: <String>{},
                                           ),
-                                          professional: EmployeeProfessionalProfile(
-                                            position: '',
-                                            employeeId: record.id,
-                                            department: '',
-                                            managerName: '',
-                                            employmentType: '',
-                                            location: '',
-                                            workSpace: '',
-                                            jobLevel: '',
-                                            startDate: null,
-                                            confirmationDate: null,
-                                            skills: '',
-                                          ),
+                                          professional:
+                                              EmployeeProfessionalProfile(
+                                                position: '',
+                                                employeeId: record.id,
+                                                department: '',
+                                                managerName: '',
+                                                employmentType: '',
+                                                location: '',
+                                                workSpace: '',
+                                                jobLevel: '',
+                                                startDate: null,
+                                                confirmationDate: null,
+                                                skills: '',
+                                              ),
                                         );
-                                        context.read<EmployeeDirectory>().addEmployee(globalRecord);
+                                        context
+                                            .read<EmployeeDirectory>()
+                                            .addEmployee(globalRecord);
                                         Navigator.of(dialogCtx).pop();
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Employee "${record.name}" created successfully.')),
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Employee "${record.name}" created successfully.',
+                                            ),
+                                          ),
                                         );
                                       },
                                     ),
@@ -943,23 +1160,32 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                       onView: (record) {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => ChangeNotifierProvider<EmployeeDirectory>.value(
-                              value: context.read<EmployeeDirectory>()..setPrimaryEmployee(record.id),
-                              child: HREmployeePortalPage(employeeId: record.id),
-                            ),
+                            builder: (_) =>
+                                ChangeNotifierProvider<EmployeeDirectory>.value(
+                                  value: context.read<EmployeeDirectory>()
+                                    ..setPrimaryEmployee(record.id),
+                                  child: HREmployeePortalPage(
+                                    employeeId: record.id,
+                                  ),
+                                ),
                           ),
                         );
                       },
                       onEdit: (record) async {
                         final updatedRecord = await showDialog<_EmployeeRecord>(
                           context: context,
-                          builder: (context) => _EditEmployeeDialog(employee: record),
+                          builder: (context) =>
+                              _EditEmployeeDialog(employee: record),
                         );
                         if (!context.mounted) return;
                         if (updatedRecord != null) {
                           _data.updateEmployee(record, updatedRecord);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Employee "${updatedRecord.name}" updated.')),
+                            SnackBar(
+                              content: Text(
+                                'Employee "${updatedRecord.name}" updated.',
+                              ),
+                            ),
                           );
                         }
                       },
@@ -968,15 +1194,21 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('Delete Employee'),
-                            content: Text('Are you sure you want to delete ${record.name}?'),
+                            content: Text(
+                              'Are you sure you want to delete ${record.name}?',
+                            ),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.of(context).pop(false),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(false),
                                 child: const Text('Cancel'),
                               ),
                               ElevatedButton(
-                                onPressed: () => Navigator.of(context).pop(true),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
                                 child: const Text('Delete'),
                               ),
                             ],
@@ -986,7 +1218,11 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                         if (confirmed == true) {
                           _data.removeEmployee(record);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Employee "${record.name}" deleted.')),
+                            SnackBar(
+                              content: Text(
+                                'Employee "${record.name}" deleted.',
+                              ),
+                            ),
                           );
                         }
                       },
@@ -1061,7 +1297,7 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
         profile: _EmployeeProfileData.empty(),
       );
       widget.onCreate(record);
-      
+
       // Clear form
       _nameController.clear();
       _emailController.clear();
@@ -1090,19 +1326,29 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
           children: [
             const Text(
               'Create New Employee',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               'Fill in the details below to set up a new employee account. The password entered will be used for the initial login.',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 24),
             TextFormField(
               controller: _employeeIdController,
               decoration: InputDecoration(
                 labelText: 'Employee ID',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 prefixIcon: const Icon(Icons.badge_outlined),
               ),
               validator: (value) {
@@ -1117,7 +1363,9 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
               controller: _nameController,
               decoration: InputDecoration(
                 labelText: 'Employee Name',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 prefixIcon: const Icon(Icons.person_outline),
               ),
               validator: (value) {
@@ -1132,7 +1380,9 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
               controller: _emailController,
               decoration: InputDecoration(
                 labelText: 'Employee Email',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 prefixIcon: const Icon(Icons.email_outlined),
               ),
               validator: (value) {
@@ -1151,10 +1401,14 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
               controller: _passwordController,
               decoration: InputDecoration(
                 labelText: 'Password',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  ),
                   onPressed: () {
                     setState(() {
                       _obscurePassword = !_obscurePassword;
@@ -1186,18 +1440,25 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Icon(Icons.person_add_alt_1_outlined),
                 label: Text(
                   _isCreating ? 'Creating...' : 'Create Employee',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF782B),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
@@ -1264,7 +1525,9 @@ class _EmployeeListViewState extends State<_EmployeeListView> {
     final maxPageIndex = (_totalPages == 0) ? 0 : _totalPages - 1;
     final currentPage = _page.clamp(0, maxPageIndex);
     final start = currentPage * _pageSize;
-    final endExclusive = (start + _pageSize) > widget.employees.length ? widget.employees.length : (start + _pageSize);
+    final endExclusive = (start + _pageSize) > widget.employees.length
+        ? widget.employees.length
+        : (start + _pageSize);
     final visible = widget.employees.sublist(start, endExclusive);
 
     return LayoutBuilder(
@@ -1277,7 +1540,11 @@ class _EmployeeListViewState extends State<_EmployeeListView> {
               if (widget.showTitle) ...[
                 const Text(
                   'Employee List',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -1300,12 +1567,17 @@ class _EmployeeListViewState extends State<_EmployeeListView> {
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(Colors.grey.shade100),
+                      headingRowColor: WidgetStateProperty.all(
+                        Colors.grey.shade100,
+                      ),
                       columnSpacing: 28,
                       horizontalMargin: 24,
                       dataRowMinHeight: 60,
                       dataRowMaxHeight: 60,
-                      headingTextStyle: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black87),
+                      headingTextStyle: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
                       columns: const [
                         DataColumn(label: Text('Employee ID')),
                         DataColumn(label: Text('Employee Name')),
@@ -1463,7 +1735,10 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
                       const Expanded(
                         child: Text(
                           'Edit Employee',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       IconButton(
@@ -1478,7 +1753,9 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
                     controller: _employeeIdController,
                     decoration: InputDecoration(
                       labelText: 'Employee ID',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       prefixIcon: const Icon(Icons.badge_outlined),
                     ),
                     validator: (value) {
@@ -1493,7 +1770,9 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
                     controller: _nameController,
                     decoration: InputDecoration(
                       labelText: 'Employee Name',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       prefixIcon: const Icon(Icons.person_outline),
                     ),
                     validator: (value) {
@@ -1508,7 +1787,9 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
                     controller: _emailController,
                     decoration: InputDecoration(
                       labelText: 'Employee Email',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       prefixIcon: const Icon(Icons.email_outlined),
                     ),
                     validator: (value) {
@@ -1527,10 +1808,16 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
                     controller: _passwordController,
                     decoration: InputDecoration(
                       labelText: 'Password',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
                         onPressed: () {
                           setState(() {
                             _obscurePassword = !_obscurePassword;
@@ -1556,11 +1843,19 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
                     child: ElevatedButton.icon(
                       onPressed: _save,
                       icon: const Icon(Icons.save_outlined),
-                      label: const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      label: const Text(
+                        'Save Changes',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFF782B),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -1585,11 +1880,15 @@ class _JobsModuleState extends State<_JobsModule> {
   static const int _itemsPerPage = 10;
   int _currentPage = 0;
 
-  void _downloadResume(BuildContext context, String fileName, String? resumeData) {
+  void _downloadResume(
+    BuildContext context,
+    String fileName,
+    String? resumeData,
+  ) {
     if (resumeData != null && resumeData.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Downloading $fileName...')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Downloading $fileName...')));
       // TODO: Implement actual file download using dart:html for web or file_saver package
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1598,12 +1897,18 @@ class _JobsModuleState extends State<_JobsModule> {
     }
   }
 
-  Future<void> _deleteApplication(BuildContext context, String email, String jobId) async {
+  Future<void> _deleteApplication(
+    BuildContext context,
+    String email,
+    String jobId,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Application'),
-        content: Text('Are you sure you want to delete the application from $email?\n\nThis action cannot be undone.'),
+        content: Text(
+          'Are you sure you want to delete the application from $email?\n\nThis action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1671,17 +1976,27 @@ class _JobsModuleState extends State<_JobsModule> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade300),
+                  ),
                 ),
                 child: Row(
                   children: [
                     const Text(
                       'Job Applications',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const Spacer(),
                     OutlinedButton.icon(
@@ -1690,8 +2005,13 @@ class _JobsModuleState extends State<_JobsModule> {
                       label: const Text('Post Job'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFFF782B),
-                        side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        side: BorderSide(
+                          color: const Color(0xFFFF782B).withValues(alpha: 0.6),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
                     ),
                   ],
@@ -1710,10 +2030,13 @@ class _JobsModuleState extends State<_JobsModule> {
           ),
         ),
         const SizedBox(height: 12),
-        _currentPage > 0 || ApplicationStore.I.jobApplications.length > _itemsPerPage
+        _currentPage > 0 ||
+                ApplicationStore.I.jobApplications.length > _itemsPerPage
             ? _PaginationControls(
                 currentPage: _currentPage,
-                totalPages: (ApplicationStore.I.jobApplications.length / _itemsPerPage).ceil(),
+                totalPages:
+                    (ApplicationStore.I.jobApplications.length / _itemsPerPage)
+                        .ceil(),
                 onPageChanged: (page) {
                   setState(() => _currentPage = page);
                 },
@@ -1735,11 +2058,15 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
   static const int _itemsPerPage = 10;
   int _currentPage = 0;
 
-  void _downloadResume(BuildContext context, String fileName, String? resumeData) {
+  void _downloadResume(
+    BuildContext context,
+    String fileName,
+    String? resumeData,
+  ) {
     if (resumeData != null && resumeData.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Downloading $fileName...')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Downloading $fileName...')));
       // TODO: Implement actual file download using dart:html for web or file_saver package
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1748,12 +2075,18 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
     }
   }
 
-  Future<void> _deleteApplication(BuildContext context, String email, String internshipId) async {
+  Future<void> _deleteApplication(
+    BuildContext context,
+    String email,
+    String internshipId,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Application'),
-        content: Text('Are you sure you want to delete the application from $email?\n\nThis action cannot be undone.'),
+        content: Text(
+          'Are you sure you want to delete the application from $email?\n\nThis action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1773,7 +2106,10 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
 
     if (!context.mounted) return;
     if (confirmed != true) return;
-    final success = ApplicationStore.I.deleteInternshipApplication(email, internshipId);
+    final success = ApplicationStore.I.deleteInternshipApplication(
+      email,
+      internshipId,
+    );
     if (!context.mounted) return;
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1821,17 +2157,27 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade300),
+                  ),
                 ),
                 child: Row(
                   children: [
                     const Text(
                       'Internship Applications',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const Spacer(),
                     OutlinedButton.icon(
@@ -1840,8 +2186,13 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
                       label: const Text('Post Internship'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFFF782B),
-                        side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        side: BorderSide(
+                          color: const Color(0xFFFF782B).withValues(alpha: 0.6),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
                     ),
                   ],
@@ -1860,10 +2211,14 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
           ),
         ),
         const SizedBox(height: 12),
-        _currentPage > 0 || ApplicationStore.I.internshipApplications.length > _itemsPerPage
+        _currentPage > 0 ||
+                ApplicationStore.I.internshipApplications.length > _itemsPerPage
             ? _PaginationControls(
                 currentPage: _currentPage,
-                totalPages: (ApplicationStore.I.internshipApplications.length / _itemsPerPage).ceil(),
+                totalPages:
+                    (ApplicationStore.I.internshipApplications.length /
+                            _itemsPerPage)
+                        .ceil(),
                 onPageChanged: (page) {
                   setState(() => _currentPage = page);
                 },
@@ -1885,7 +2240,10 @@ class _ApplicationListHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFF782B).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFF782B).withValues(alpha: 0.2), width: 1),
+        border: Border.all(
+          color: const Color(0xFFFF782B).withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -2014,7 +2372,11 @@ class _JobApplicationsList extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade300),
+                  Icon(
+                    Icons.inbox_outlined,
+                    size: 64,
+                    color: Colors.grey.shade300,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'No job applications yet',
@@ -2037,10 +2399,12 @@ class _JobApplicationsList extends StatelessWidget {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                 itemCount: items.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final app = items[index];
-                  final dateStr = '${app.createdAt.year.toString().padLeft(4,'0')}-${app.createdAt.month.toString().padLeft(2,'0')}-${app.createdAt.day.toString().padLeft(2,'0')}';
+                  final dateStr =
+                      '${app.createdAt.year.toString().padLeft(4, '0')}-${app.createdAt.month.toString().padLeft(2, '0')}-${app.createdAt.day.toString().padLeft(2, '0')}';
 
                   return _ApplicationCard(
                     email: app.email,
@@ -2048,9 +2412,14 @@ class _JobApplicationsList extends StatelessWidget {
                     dateStr: dateStr,
                     status: app.status,
                     onStatusChanged: (newStatus) {
-                      ApplicationStore.I.updateJobApplicationStatus(app.email, app.jobId, newStatus);
+                      ApplicationStore.I.updateJobApplicationStatus(
+                        app.email,
+                        app.jobId,
+                        newStatus,
+                      );
                     },
-                    onDownload: () => onDownload(context, app.resumeName, app.resumeData),
+                    onDownload: () =>
+                        onDownload(context, app.resumeName, app.resumeData),
                     onDelete: () => onDelete(context, app.email, app.jobId),
                   );
                 },
@@ -2090,7 +2459,11 @@ class _InternshipApplicationsList extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade300),
+                  Icon(
+                    Icons.inbox_outlined,
+                    size: 64,
+                    color: Colors.grey.shade300,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'No internship applications yet',
@@ -2113,10 +2486,12 @@ class _InternshipApplicationsList extends StatelessWidget {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                 itemCount: items.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final app = items[index];
-                  final dateStr = '${app.createdAt.year.toString().padLeft(4,'0')}-${app.createdAt.month.toString().padLeft(2,'0')}-${app.createdAt.day.toString().padLeft(2,'0')}';
+                  final dateStr =
+                      '${app.createdAt.year.toString().padLeft(4, '0')}-${app.createdAt.month.toString().padLeft(2, '0')}-${app.createdAt.day.toString().padLeft(2, '0')}';
 
                   return _ApplicationCard(
                     email: app.email,
@@ -2124,10 +2499,16 @@ class _InternshipApplicationsList extends StatelessWidget {
                     dateStr: dateStr,
                     status: app.status,
                     onStatusChanged: (newStatus) {
-                      ApplicationStore.I.updateInternshipApplicationStatus(app.email, app.internshipId, newStatus);
+                      ApplicationStore.I.updateInternshipApplicationStatus(
+                        app.email,
+                        app.internshipId,
+                        newStatus,
+                      );
                     },
-                    onDownload: () => onDownload(context, app.resumeName, app.resumeData),
-                    onDelete: () => onDelete(context, app.email, app.internshipId),
+                    onDownload: () =>
+                        onDownload(context, app.resumeName, app.resumeData),
+                    onDelete: () =>
+                        onDelete(context, app.email, app.internshipId),
                   );
                 },
               ),
@@ -2202,7 +2583,11 @@ class _ApplicationCard extends StatelessWidget {
               flex: 2,
               child: Row(
                 children: [
-                  const Icon(Icons.description_outlined, size: 16, color: Colors.black54),
+                  const Icon(
+                    Icons.description_outlined,
+                    size: 16,
+                    color: Colors.black54,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -2222,7 +2607,11 @@ class _ApplicationCard extends StatelessWidget {
             // 3. Applied On Date
             Row(
               children: [
-                const Icon(Icons.calendar_today_outlined, size: 16, color: Colors.black54),
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: Colors.black54,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   dateStr,
@@ -2250,7 +2639,10 @@ class _ApplicationCard extends StatelessWidget {
                 backgroundColor: const Color(0xFFFF782B),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -2312,7 +2704,10 @@ class _StatusChipDropdown extends StatelessWidget {
       decoration: BoxDecoration(
         color: statusColor.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: statusColor.withValues(alpha: 0.4), width: 1.5),
+        border: Border.all(
+          color: statusColor.withValues(alpha: 0.4),
+          width: 1.5,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -2333,7 +2728,10 @@ class _StatusChipDropdown extends StatelessWidget {
                 children: const [
                   Icon(Icons.pending, size: 14, color: Color(0xFFFF9800)),
                   SizedBox(width: 6),
-                  Text('In Progress', style: TextStyle(color: Color(0xFFFF9800), fontSize: 12)),
+                  Text(
+                    'In Progress',
+                    style: TextStyle(color: Color(0xFFFF9800), fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -2343,7 +2741,10 @@ class _StatusChipDropdown extends StatelessWidget {
                 children: const [
                   Icon(Icons.check_circle, size: 14, color: Color(0xFF4CAF50)),
                   SizedBox(width: 6),
-                  Text('Selected', style: TextStyle(color: Color(0xFF4CAF50), fontSize: 12)),
+                  Text(
+                    'Selected',
+                    style: TextStyle(color: Color(0xFF4CAF50), fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -2353,7 +2754,10 @@ class _StatusChipDropdown extends StatelessWidget {
                 children: const [
                   Icon(Icons.cancel, size: 14, color: Color(0xFFF44336)),
                   SizedBox(width: 6),
-                  Text('Rejected', style: TextStyle(color: Color(0xFFF44336), fontSize: 12)),
+                  Text(
+                    'Rejected',
+                    style: TextStyle(color: Color(0xFFF44336), fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -2393,21 +2797,29 @@ class _PaginationControls extends StatelessWidget {
         children: [
           // Previous button
           IconButton(
-            onPressed: currentPage > 0 ? () => onPageChanged(currentPage - 1) : null,
+            onPressed: currentPage > 0
+                ? () => onPageChanged(currentPage - 1)
+                : null,
             icon: const Icon(Icons.chevron_left),
             tooltip: 'Previous Page',
             style: IconButton.styleFrom(
-              backgroundColor: currentPage > 0 ? const Color(0xFFFF782B).withValues(alpha: 0.1) : Colors.grey.shade200,
-              foregroundColor: currentPage > 0 ? const Color(0xFFFF782B) : Colors.grey,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              backgroundColor: currentPage > 0
+                  ? const Color(0xFFFF782B).withValues(alpha: 0.1)
+                  : Colors.grey.shade200,
+              foregroundColor: currentPage > 0
+                  ? const Color(0xFFFF782B)
+                  : Colors.grey,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
           const SizedBox(width: 16),
           // Page numbers
           ...List.generate(totalPages, (index) {
             // Show first page, last page, current page, and pages around current
-            if (index == 0 || 
-                index == totalPages - 1 || 
+            if (index == 0 ||
+                index == totalPages - 1 ||
                 (index >= currentPage - 1 && index <= currentPage + 1)) {
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -2420,7 +2832,10 @@ class _PaginationControls extends StatelessWidget {
             } else if (index == currentPage - 2 || index == currentPage + 2) {
               return const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 4),
-                child: Text('...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: Text(
+                  '...',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               );
             }
             return const SizedBox.shrink();
@@ -2428,13 +2843,21 @@ class _PaginationControls extends StatelessWidget {
           // Next button
           const SizedBox(width: 16),
           IconButton(
-            onPressed: currentPage < totalPages - 1 ? () => onPageChanged(currentPage + 1) : null,
+            onPressed: currentPage < totalPages - 1
+                ? () => onPageChanged(currentPage + 1)
+                : null,
             icon: const Icon(Icons.chevron_right),
             tooltip: 'Next Page',
             style: IconButton.styleFrom(
-              backgroundColor: currentPage < totalPages - 1 ? const Color(0xFFFF782B).withValues(alpha: 0.1) : Colors.grey.shade200,
-              foregroundColor: currentPage < totalPages - 1 ? const Color(0xFFFF782B) : Colors.grey,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              backgroundColor: currentPage < totalPages - 1
+                  ? const Color(0xFFFF782B).withValues(alpha: 0.1)
+                  : Colors.grey.shade200,
+              foregroundColor: currentPage < totalPages - 1
+                  ? const Color(0xFFFF782B)
+                  : Colors.grey,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
           // Page info
@@ -2514,9 +2937,13 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
     final hasActive = context.watch<AlertService>().hasActive;
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<EmployeeDirectory>(create: (_) => EmployeeDirectory()),
+        ChangeNotifierProvider<EmployeeDirectory>(
+          create: (_) => EmployeeDirectory(),
+        ),
         ChangeNotifierProvider<PostStore>.value(value: PostStore.I),
-        ChangeNotifierProvider<ApplicationStore>.value(value: ApplicationStore.I),
+        ChangeNotifierProvider<ApplicationStore>.value(
+          value: ApplicationStore.I,
+        ),
       ],
       child: Scaffold(
         appBar: AppBar(
@@ -2526,20 +2953,34 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
           actions: [
             TextButton.icon(
               onPressed: () => setState(() => _selected = _HRMenu.alerts),
-              icon: Icon(Icons.campaign_outlined, color: hasActive ? Colors.redAccent : Colors.white),
+              icon: Icon(
+                Icons.campaign_outlined,
+                color: hasActive ? Colors.redAccent : Colors.white,
+              ),
               label: Text(
                 'Alerts',
-                style: TextStyle(color: hasActive ? Colors.redAccent : Colors.white, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: hasActive ? Colors.redAccent : Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               style: TextButton.styleFrom(foregroundColor: Colors.white),
             ),
             const SizedBox(width: 8),
             TextButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('mail id : hr@apexnuera.com')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('mail id : hr@apexnuera.com')),
+                );
               },
               icon: const Icon(Icons.support_agent, color: Colors.white),
-              label: const Text('Contact', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              label: const Text(
+                'Contact',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               style: TextButton.styleFrom(foregroundColor: Colors.white),
             ),
             const SizedBox(width: 8),
@@ -2557,7 +2998,12 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
                     onSelect: (m) => setState(() => _selected = m),
                   ),
                   const VerticalDivider(width: 1),
-                  Expanded(child: _RightPanel(selected: _selected, onSelect: (m) => setState(() => _selected = m))),
+                  Expanded(
+                    child: _RightPanel(
+                      selected: _selected,
+                      onSelect: (m) => setState(() => _selected = m),
+                    ),
+                  ),
                 ],
               );
             }
@@ -2568,7 +3014,12 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
                   onSelect: (m) => setState(() => _selected = m),
                 ),
                 const Divider(height: 1),
-                Expanded(child: _RightPanel(selected: _selected, onSelect: (m) => setState(() => _selected = m))),
+                Expanded(
+                  child: _RightPanel(
+                    selected: _selected,
+                    onSelect: (m) => setState(() => _selected = m),
+                  ),
+                ),
               ],
             );
           },
@@ -2592,7 +3043,10 @@ class _Sidebar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         children: [
           ListTile(
-            leading: const Icon(Icons.dashboard_outlined, color: Color(0xFFFF782B)),
+            leading: const Icon(
+              Icons.dashboard_outlined,
+              color: Color(0xFFFF782B),
+            ),
             title: const Text('Overview'),
             selected: selected == _HRMenu.overview,
             onTap: () => onSelect(_HRMenu.overview),
@@ -2604,8 +3058,14 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelect(_HRMenu.queries),
           ),
           ListTile(
-            leading: Icon(Icons.campaign_outlined, color: hasActive ? Colors.red : const Color(0xFFFF782B)),
-            title: Text('Alerts', style: TextStyle(color: hasActive ? Colors.red : null)),
+            leading: Icon(
+              Icons.campaign_outlined,
+              color: hasActive ? Colors.red : const Color(0xFFFF782B),
+            ),
+            title: Text(
+              'Alerts',
+              style: TextStyle(color: hasActive ? Colors.red : null),
+            ),
             selected: selected == _HRMenu.alerts,
             onTap: () => onSelect(_HRMenu.alerts),
           ),
@@ -2617,7 +3077,10 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelect(_HRMenu.postJob),
           ),
           ListTile(
-            leading: const Icon(Icons.school_outlined, color: Color(0xFFFF782B)),
+            leading: const Icon(
+              Icons.school_outlined,
+              color: Color(0xFFFF782B),
+            ),
             title: const Text('Internships'),
             selected: selected == _HRMenu.postInternship,
             onTap: () => onSelect(_HRMenu.postInternship),
@@ -2655,7 +3118,10 @@ class _TopNav extends StatelessWidget {
         children: [
           TextButton.icon(
             onPressed: () => onSelect(_HRMenu.overview),
-            icon: const Icon(Icons.dashboard_outlined, color: Color(0xFFFF782B)),
+            icon: const Icon(
+              Icons.dashboard_outlined,
+              color: Color(0xFFFF782B),
+            ),
             label: const Text('Overview'),
           ),
           TextButton.icon(
@@ -2665,14 +3131,22 @@ class _TopNav extends StatelessWidget {
           ),
           TextButton.icon(
             onPressed: () => onSelect(_HRMenu.alerts),
-            icon: Icon(Icons.campaign_outlined, color: hasActive ? Colors.red : const Color(0xFFFF782B)),
-            label: Text('Alerts', style: TextStyle(color: hasActive ? Colors.red : null)),
+            icon: Icon(
+              Icons.campaign_outlined,
+              color: hasActive ? Colors.red : const Color(0xFFFF782B),
+            ),
+            label: Text(
+              'Alerts',
+              style: TextStyle(color: hasActive ? Colors.red : null),
+            ),
           ),
           const SizedBox(width: 8),
           TextButton.icon(
             onPressed: () {
               // Contact at top: open mailto
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('mail id : hr@apexnuera.com')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('mail id : hr@apexnuera.com')),
+              );
             },
             icon: const Icon(Icons.support_agent, color: Color(0xFFFF782B)),
             label: const Text('Contact'),
@@ -2752,7 +3226,11 @@ class _InfoCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final Widget child;
-  const _InfoCard({required this.icon, required this.title, required this.child});
+  const _InfoCard({
+    required this.icon,
+    required this.title,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2770,7 +3248,13 @@ class _InfoCard extends StatelessWidget {
                 children: [
                   Icon(icon, color: const Color(0xFFFF782B)),
                   const SizedBox(width: 8),
-                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -2795,7 +3279,9 @@ class _WelcomePanel extends StatelessWidget {
           // Welcome Header
           Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -2811,23 +3297,30 @@ class _WelcomePanel extends StatelessWidget {
                 children: [
                   const Text(
                     'HR Dashboard Overview',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Welcome back! Here\'s a summary of your HR operations.',
-                    style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.9)),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Key Metrics Row
           _MetricsRow(),
           const SizedBox(height: 16),
-          
+
           // Recent Activities and Quick Actions
           LayoutBuilder(
             builder: (context, constraints) {
@@ -2866,19 +3359,47 @@ class _MetricsRow extends StatelessWidget {
     final jobCount = context.watch<PostStore>().jobs.length;
     final internshipCount = context.watch<PostStore>().internships.length;
     final activeAlerts = context.watch<AlertService>().activeAlerts.length;
-    
+
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= 800) {
           return Row(
             children: [
-              Expanded(child: _MetricCard(icon: Icons.people_outline, title: 'Total Employees', value: '$employeeCount', color: const Color(0xFF4CAF50))),
+              Expanded(
+                child: _MetricCard(
+                  icon: Icons.people_outline,
+                  title: 'Total Employees',
+                  value: '$employeeCount',
+                  color: const Color(0xFF4CAF50),
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _MetricCard(icon: Icons.work_outline, title: 'Active Jobs', value: '$jobCount', color: const Color(0xFF2196F3))),
+              Expanded(
+                child: _MetricCard(
+                  icon: Icons.work_outline,
+                  title: 'Active Jobs',
+                  value: '$jobCount',
+                  color: const Color(0xFF2196F3),
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _MetricCard(icon: Icons.school_outlined, title: 'Internships', value: '$internshipCount', color: const Color(0xFF9C27B0))),
+              Expanded(
+                child: _MetricCard(
+                  icon: Icons.school_outlined,
+                  title: 'Internships',
+                  value: '$internshipCount',
+                  color: const Color(0xFF9C27B0),
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _MetricCard(icon: Icons.campaign_outlined, title: 'Active Alerts', value: '$activeAlerts', color: const Color(0xFFFF5722))),
+              Expanded(
+                child: _MetricCard(
+                  icon: Icons.campaign_outlined,
+                  title: 'Active Alerts',
+                  value: '$activeAlerts',
+                  color: const Color(0xFFFF5722),
+                ),
+              ),
             ],
           );
         }
@@ -2886,17 +3407,45 @@ class _MetricsRow extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: _MetricCard(icon: Icons.people_outline, title: 'Total Employees', value: '$employeeCount', color: const Color(0xFF4CAF50))),
+                Expanded(
+                  child: _MetricCard(
+                    icon: Icons.people_outline,
+                    title: 'Total Employees',
+                    value: '$employeeCount',
+                    color: const Color(0xFF4CAF50),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _MetricCard(icon: Icons.work_outline, title: 'Active Jobs', value: '$jobCount', color: const Color(0xFF2196F3))),
+                Expanded(
+                  child: _MetricCard(
+                    icon: Icons.work_outline,
+                    title: 'Active Jobs',
+                    value: '$jobCount',
+                    color: const Color(0xFF2196F3),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _MetricCard(icon: Icons.school_outlined, title: 'Internships', value: '$internshipCount', color: const Color(0xFF9C27B0))),
+                Expanded(
+                  child: _MetricCard(
+                    icon: Icons.school_outlined,
+                    title: 'Internships',
+                    value: '$internshipCount',
+                    color: const Color(0xFF9C27B0),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _MetricCard(icon: Icons.campaign_outlined, title: 'Active Alerts', value: '$activeAlerts', color: const Color(0xFFFF5722))),
+                Expanded(
+                  child: _MetricCard(
+                    icon: Icons.campaign_outlined,
+                    title: 'Active Alerts',
+                    value: '$activeAlerts',
+                    color: const Color(0xFFFF5722),
+                  ),
+                ),
               ],
             ),
           ],
@@ -2911,9 +3460,14 @@ class _MetricCard extends StatelessWidget {
   final String title;
   final String value;
   final Color color;
-  
-  const _MetricCard({required this.icon, required this.title, required this.value, required this.color});
-  
+
+  const _MetricCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -2935,11 +3489,21 @@ class _MetricCard extends StatelessWidget {
                   child: Icon(icon, color: color, size: 24),
                 ),
                 const Spacer(),
-                Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
-            Text(title, style: const TextStyle(fontSize: 13, color: Colors.black54)),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
+            ),
           ],
         ),
       ),
@@ -2953,9 +3517,9 @@ class _RecentActivities extends StatelessWidget {
     final jobApps = context.watch<ApplicationStore>().jobApplications;
     final internApps = context.watch<ApplicationStore>().internshipApplications;
     final alerts = context.watch<AlertService>().alerts;
-    
+
     final activities = <Map<String, dynamic>>[];
-    
+
     // Add job applications
     for (final app in jobApps.take(3)) {
       activities.add({
@@ -2966,7 +3530,7 @@ class _RecentActivities extends StatelessWidget {
         'color': const Color(0xFF2196F3),
       });
     }
-    
+
     // Add internship applications
     for (final app in internApps.take(2)) {
       activities.add({
@@ -2977,21 +3541,25 @@ class _RecentActivities extends StatelessWidget {
         'color': const Color(0xFF9C27B0),
       });
     }
-    
+
     // Add recent alerts
     for (final alert in alerts.take(2)) {
       activities.add({
         'icon': Icons.campaign_outlined,
         'title': 'Alert Posted',
-        'subtitle': alert.text.length > 40 ? '${alert.text.substring(0, 40)}...' : alert.text,
+        'subtitle': alert.text.length > 40
+            ? '${alert.text.substring(0, 40)}...'
+            : alert.text,
         'time': _formatTime(alert.createdAt),
         'color': const Color(0xFFFF5722),
       });
     }
-    
+
     // Sort by time (most recent first)
-    activities.sort((a, b) => b['time'].toString().compareTo(a['time'].toString()));
-    
+    activities.sort(
+      (a, b) => b['time'].toString().compareTo(a['time'].toString()),
+    );
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -3004,7 +3572,10 @@ class _RecentActivities extends StatelessWidget {
               children: const [
                 Icon(Icons.history, color: Color(0xFFFF782B)),
                 SizedBox(width: 8),
-                Text('Recent Activities', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                Text(
+                  'Recent Activities',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -3014,51 +3585,88 @@ class _RecentActivities extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Column(
                     children: [
-                      Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade300),
+                      Icon(
+                        Icons.inbox_outlined,
+                        size: 48,
+                        color: Colors.grey.shade300,
+                      ),
                       const SizedBox(height: 8),
-                      Text('No recent activities', style: TextStyle(color: Colors.grey.shade600)),
+                      Text(
+                        'No recent activities',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
                     ],
                   ),
                 ),
               )
             else
-              ...activities.take(5).map((activity) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: (activity['color'] as Color).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(activity['icon'] as IconData, color: activity['color'] as Color, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              ...activities
+                  .take(5)
+                  .map(
+                    (activity) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
                         children: [
-                          Text(activity['title'] as String, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                          const SizedBox(height: 2),
-                          Text(activity['subtitle'] as String, style: const TextStyle(fontSize: 12, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: (activity['color'] as Color).withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              activity['icon'] as IconData,
+                              color: activity['color'] as Color,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  activity['title'] as String,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  activity['subtitle'] as String,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black54,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            activity['time'] as String,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.black38,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    Text(activity['time'] as String, style: const TextStyle(fontSize: 11, color: Colors.black38)),
-                  ],
-                ),
-              )),
+                  ),
           ],
         ),
       ),
     );
   }
-  
+
   String _formatTime(DateTime dt) {
     final now = DateTime.now();
     final diff = now.difference(dt);
-    
+
     if (diff.inMinutes < 1) return 'Just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
@@ -3084,7 +3692,10 @@ class _QuickActions extends StatelessWidget {
               children: const [
                 Icon(Icons.bolt_outlined, color: Color(0xFFFF782B)),
                 SizedBox(width: 8),
-                Text('Quick Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                Text(
+                  'Quick Actions',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -3128,9 +3739,13 @@ class _QuickActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  
-  const _QuickActionButton({required this.icon, required this.label, required this.onTap});
-  
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -3146,8 +3761,20 @@ class _QuickActionButton extends StatelessWidget {
           children: [
             Icon(icon, color: const Color(0xFFFF782B), size: 20),
             const SizedBox(width: 12),
-            Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black38),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 14,
+              color: Colors.black38,
+            ),
           ],
         ),
       ),
@@ -3176,12 +3803,18 @@ class _QueriesList extends StatelessWidget {
                     for (final q in items)
                       ListTile(
                         dense: true,
-                        leading: const Icon(Icons.email_outlined, color: Color(0xFFFF782B)),
+                        leading: const Icon(
+                          Icons.email_outlined,
+                          color: Color(0xFFFF782B),
+                        ),
                         title: Text(q.email),
                         subtitle: Text(q.description),
                         trailing: Text(
-                          '${q.createdAt.year.toString().padLeft(4,'0')}-${q.createdAt.month.toString().padLeft(2,'0')}-${q.createdAt.day.toString().padLeft(2,'0')}',
-                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          '${q.createdAt.year.toString().padLeft(4, '0')}-${q.createdAt.month.toString().padLeft(2, '0')}-${q.createdAt.day.toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
                         ),
                       ),
                   ],
@@ -3236,10 +3869,12 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
     // Initialize defaults when first built
     if (_postingDate.text.isEmpty) {
       final now = DateTime.now();
-      _postingDate.text = '${now.year.toString().padLeft(4,'0')}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+      _postingDate.text =
+          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     }
     if (_jobId.text.isEmpty) {
-      _jobId.text = 'JOB-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      _jobId.text =
+          'JOB-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     }
 
     return SizedBox(
@@ -3263,9 +3898,18 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Post New Job', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    const Text(
+                      'Post New Job',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 14),
-                    const Text('Basic Details', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Basic Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     LayoutBuilder(
                       builder: (context, c) {
@@ -3277,13 +3921,24 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                                 children: [
                                   Expanded(child: _buildField('Title', _title)),
                                   const SizedBox(width: 12),
-                                  Expanded(child: _buildField('Department', _department)),
+                                  Expanded(
+                                    child: _buildField(
+                                      'Department',
+                                      _department,
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 12),
                               Row(
                                 children: [
-                                  Expanded(child: _buildField('Location', _location, hint: 'City, Country')),
+                                  Expanded(
+                                    child: _buildField(
+                                      'Location',
+                                      _location,
+                                      hint: 'City, Country',
+                                    ),
+                                  ),
                                   const SizedBox(width: 12),
                                   Expanded(child: _dropdownContractType()),
                                 ],
@@ -3297,7 +3952,11 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                             const SizedBox(height: 12),
                             _buildField('Department', _department),
                             const SizedBox(height: 12),
-                            _buildField('Location', _location, hint: 'City, Country'),
+                            _buildField(
+                              'Location',
+                              _location,
+                              hint: 'City, Country',
+                            ),
                             const SizedBox(height: 12),
                             _dropdownContractType(),
                           ],
@@ -3305,7 +3964,10 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    const Text('Qualifications & Experience', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Qualifications & Experience',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     LayoutBuilder(
                       builder: (context, c) {
@@ -3315,17 +3977,39 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                             children: [
                               Row(
                                 children: [
-                                  Expanded(child: _buildField('Experience', _experience, hint: 'e.g., 3-5 years')),
+                                  Expanded(
+                                    child: _buildField(
+                                      'Experience',
+                                      _experience,
+                                      hint: 'e.g., 3-5 years',
+                                    ),
+                                  ),
                                   const SizedBox(width: 12),
-                                  Expanded(child: _buildField('Skills', _skills, hint: 'Comma-separated skills')),
+                                  Expanded(
+                                    child: _buildField(
+                                      'Skills',
+                                      _skills,
+                                      hint: 'Comma-separated skills',
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 12),
                               Row(
                                 children: [
-                                  Expanded(child: _buildMultiline('Responsibilities', _responsibilities)),
+                                  Expanded(
+                                    child: _buildMultiline(
+                                      'Responsibilities',
+                                      _responsibilities,
+                                    ),
+                                  ),
                                   const SizedBox(width: 12),
-                                  Expanded(child: _buildMultiline('Qualifications', _qualifications)),
+                                  Expanded(
+                                    child: _buildMultiline(
+                                      'Qualifications',
+                                      _qualifications,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -3333,11 +4017,22 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                         }
                         return Column(
                           children: [
-                            _buildField('Experience', _experience, hint: 'e.g., 3-5 years'),
+                            _buildField(
+                              'Experience',
+                              _experience,
+                              hint: 'e.g., 3-5 years',
+                            ),
                             const SizedBox(height: 12),
-                            _buildField('Skills', _skills, hint: 'Comma-separated skills'),
+                            _buildField(
+                              'Skills',
+                              _skills,
+                              hint: 'Comma-separated skills',
+                            ),
                             const SizedBox(height: 12),
-                            _buildMultiline('Responsibilities', _responsibilities),
+                            _buildMultiline(
+                              'Responsibilities',
+                              _responsibilities,
+                            ),
                             const SizedBox(height: 12),
                             _buildMultiline('Qualifications', _qualifications),
                           ],
@@ -3345,15 +4040,25 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    const Text('Description', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Description',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     _buildMultiline('Description', _description),
                     const SizedBox(height: 16),
-                    const Text('Timing & IDs', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Timing & IDs',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     _dateRow(),
                     const SizedBox(height: 12),
-                    _buildField('Job ID', _jobId, hint: 'Auto-filled, you can edit'),
+                    _buildField(
+                      'Job ID',
+                      _jobId,
+                      hint: 'Auto-filled, you can edit',
+                    ),
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 44,
@@ -3368,15 +4073,20 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                               contractType: _contractType,
                               department: _department.text.trim(),
                               postingDate: _postingDate.text.trim(),
-                              applicationDeadline: _applicationDeadline.text.trim(),
+                              applicationDeadline: _applicationDeadline.text
+                                  .trim(),
                               experience: _experience.text.trim(),
                               skills: _splitList(_skills.text),
-                              responsibilities: _splitLines(_responsibilities.text),
+                              responsibilities: _splitLines(
+                                _responsibilities.text,
+                              ),
                               qualifications: _splitLines(_qualifications.text),
                             );
                             PostStore.I.addJob(job);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Job posted successfully')),
+                              const SnackBar(
+                                content: Text('Job posted successfully'),
+                              ),
                             );
                           }
                         },
@@ -3384,11 +4094,20 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                           backgroundColor: const Color(0xFFFF782B),
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Submit Job', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Submit Job',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text('Manage Jobs', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Manage Jobs',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     AnimatedBuilder(
                       animation: PostStore.I,
@@ -3401,17 +4120,30 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: items.length,
-                          separatorBuilder: (_, __) => const Divider(height: 12),
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 12),
                           itemBuilder: (context, index) {
                             final j = items[index];
                             return Row(
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(j.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      Text('${j.id} • ${j.postingDate}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                      Text(
+                                        j.title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${j.id} • ${j.postingDate}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -3419,12 +4151,18 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                                   onPressed: () {
                                     final ok = PostStore.I.deleteJob(j.id);
                                     if (ok) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Job deleted')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Job deleted'),
+                                        ),
                                       );
                                     }
                                   },
-                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                  ),
                                   icon: const Icon(Icons.delete_outline),
                                   label: const Text('Delete'),
                                 ),
@@ -3444,7 +4182,11 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, {String? hint}) {
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    String? hint,
+  }) {
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
@@ -3456,7 +4198,8 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
           borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
         ),
       ),
-      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
     );
   }
 
@@ -3467,13 +4210,17 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
       decoration: InputDecoration(
         labelText: label,
         alignLabelWithHint: true,
-        prefixIcon: const Icon(Icons.description_outlined, color: Color(0xFFFF782B)),
+        prefixIcon: const Icon(
+          Icons.description_outlined,
+          color: Color(0xFFFF782B),
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         focusedBorder: const OutlineInputBorder(
           borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
         ),
       ),
-      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
     );
   }
 
@@ -3516,13 +4263,20 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
     );
   }
 
-  Widget _buildDateField(String label, TextEditingController controller, {bool allowPast = false}) {
+  Widget _buildDateField(
+    String label,
+    TextEditingController controller, {
+    bool allowPast = false,
+  }) {
     return TextFormField(
       controller: controller,
       readOnly: true,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: const Icon(Icons.date_range_outlined, color: Color(0xFFFF782B)),
+        prefixIcon: const Icon(
+          Icons.date_range_outlined,
+          color: Color(0xFFFF782B),
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         focusedBorder: const OutlineInputBorder(
           borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
@@ -3538,27 +4292,38 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
           initialDate: now,
         );
         if (picked != null) {
-          final s = '${picked.year.toString().padLeft(4,'0')}-${picked.month.toString().padLeft(2,'0')}-${picked.day.toString().padLeft(2,'0')}';
+          final s =
+              '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
           setState(() => controller.text = s);
         }
       },
-      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please select $label' : null,
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please select $label' : null,
     );
   }
 
   List<String> _splitList(String input) {
-    return input.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    return input
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
   }
 
   List<String> _splitLines(String input) {
-    return input.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    return input
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
   }
 }
 
 class _PostInternshipFormInline extends StatefulWidget {
   const _PostInternshipFormInline();
   @override
-  State<_PostInternshipFormInline> createState() => _PostInternshipFormInlineState();
+  State<_PostInternshipFormInline> createState() =>
+      _PostInternshipFormInlineState();
 }
 
 class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
@@ -3589,7 +4354,8 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
     // Initialize defaults
     if (_postingDate.text.isEmpty) {
       final now = DateTime.now();
-      _postingDate.text = '${now.year.toString().padLeft(4,'0')}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+      _postingDate.text =
+          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     }
 
     return SizedBox(
@@ -3613,9 +4379,18 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Post New Internship', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    const Text(
+                      'Post New Internship',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 14),
-                    const Text('Basic Details', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Basic Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     LayoutBuilder(
                       builder: (context, c) {
@@ -3627,15 +4402,33 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                                 children: [
                                   Expanded(child: _buildField('Title', _title)),
                                   const SizedBox(width: 12),
-                                  Expanded(child: _buildField('Duration', _duration, hint: 'e.g., 3 months')),
+                                  Expanded(
+                                    child: _buildField(
+                                      'Duration',
+                                      _duration,
+                                      hint: 'e.g., 3 months',
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 12),
                               Row(
                                 children: [
-                                  Expanded(child: _buildField('Skill', _skill, hint: 'Primary skill required')),
+                                  Expanded(
+                                    child: _buildField(
+                                      'Skill',
+                                      _skill,
+                                      hint: 'Primary skill required',
+                                    ),
+                                  ),
                                   const SizedBox(width: 12),
-                                  Expanded(child: _buildField('Qualification', _qualification, hint: 'e.g., BSc, BTech')),
+                                  Expanded(
+                                    child: _buildField(
+                                      'Qualification',
+                                      _qualification,
+                                      hint: 'e.g., BSc, BTech',
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -3645,28 +4438,48 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                           children: [
                             _buildField('Title', _title),
                             const SizedBox(height: 12),
-                            _buildField('Duration', _duration, hint: 'e.g., 3 months'),
+                            _buildField(
+                              'Duration',
+                              _duration,
+                              hint: 'e.g., 3 months',
+                            ),
                             const SizedBox(height: 12),
-                            _buildField('Skill', _skill, hint: 'Primary skill required'),
+                            _buildField(
+                              'Skill',
+                              _skill,
+                              hint: 'Primary skill required',
+                            ),
                             const SizedBox(height: 12),
-                            _buildField('Qualification', _qualification, hint: 'e.g., BSc, BTech'),
+                            _buildField(
+                              'Qualification',
+                              _qualification,
+                              hint: 'e.g., BSc, BTech',
+                            ),
                           ],
                         );
                       },
                     ),
                     const SizedBox(height: 16),
-                    const Text('Description', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Description',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 8),
                     _buildMultiline('Description', _description),
                     const SizedBox(height: 12),
-                    _buildDateField('Posting Date', _postingDate, allowPast: true),
+                    _buildDateField(
+                      'Posting Date',
+                      _postingDate,
+                      allowPast: true,
+                    ),
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 44,
                       child: ElevatedButton(
                         onPressed: () {
                           if (_formKey.currentState!.validate()) {
-                            final genId = 'INT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+                            final genId =
+                                'INT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
                             final post = InternshipPost(
                               id: genId,
                               title: _title.text.trim(),
@@ -3680,7 +4493,9 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                             );
                             PostStore.I.addInternship(post);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Internship posted successfully')),
+                              const SnackBar(
+                                content: Text('Internship posted successfully'),
+                              ),
                             );
                           }
                         },
@@ -3688,11 +4503,20 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                           backgroundColor: const Color(0xFFFF782B),
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Submit Internship', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Submit Internship',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text('Manage Internships', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Manage Internships',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     AnimatedBuilder(
                       animation: PostStore.I,
@@ -3705,30 +4529,51 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: items.length,
-                          separatorBuilder: (_, __) => const Divider(height: 12),
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 12),
                           itemBuilder: (context, index) {
                             final it = items[index];
                             return Row(
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(it.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      Text('${it.id} • ${it.postingDate}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                      Text(
+                                        it.title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${it.id} • ${it.postingDate}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
                                 TextButton.icon(
                                   onPressed: () {
-                                    final ok = PostStore.I.deleteInternship(it.id);
+                                    final ok = PostStore.I.deleteInternship(
+                                      it.id,
+                                    );
                                     if (ok) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Internship deleted')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Internship deleted'),
+                                        ),
                                       );
                                     }
                                   },
-                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                  ),
                                   icon: const Icon(Icons.delete_outline),
                                   label: const Text('Delete'),
                                 ),
@@ -3748,7 +4593,11 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, {String? hint}) {
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    String? hint,
+  }) {
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
@@ -3760,7 +4609,8 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
           borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
         ),
       ),
-      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
     );
   }
 
@@ -3771,23 +4621,34 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
       decoration: InputDecoration(
         labelText: label,
         alignLabelWithHint: true,
-        prefixIcon: const Icon(Icons.description_outlined, color: Color(0xFFFF782B)),
+        prefixIcon: const Icon(
+          Icons.description_outlined,
+          color: Color(0xFFFF782B),
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         focusedBorder: const OutlineInputBorder(
           borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
         ),
       ),
-      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
     );
   }
 
-  Widget _buildDateField(String label, TextEditingController controller, {bool allowPast = false}) {
+  Widget _buildDateField(
+    String label,
+    TextEditingController controller, {
+    bool allowPast = false,
+  }) {
     return TextFormField(
       controller: controller,
       readOnly: true,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: const Icon(Icons.date_range_outlined, color: Color(0xFFFF782B)),
+        prefixIcon: const Icon(
+          Icons.date_range_outlined,
+          color: Color(0xFFFF782B),
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         focusedBorder: const OutlineInputBorder(
           borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
@@ -3803,11 +4664,13 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
           initialDate: now,
         );
         if (picked != null) {
-          final s = '${picked.year.toString().padLeft(4,'0')}-${picked.month.toString().padLeft(2,'0')}-${picked.day.toString().padLeft(2,'0')}';
+          final s =
+              '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
           setState(() => controller.text = s);
         }
       },
-      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please select $label' : null,
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please select $label' : null,
     );
   }
 }
