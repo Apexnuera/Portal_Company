@@ -265,6 +265,7 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
         builder: (context) => ProfessionalProfileContent(
           initialProfile: liveRecord.professional,
           forceEditMode: false,
+          isHrMode: true, // HR mode
           onSaved: (updated) {
             directory.updateProfessionalProfile(widget.employeeId, updated);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -301,8 +302,9 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
         backgroundColor: const Color(0xFFFF782B), // Orange theme
         foregroundColor: Colors.white,
         actions: [
+          // Profile picture on top right - click to enlarge
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
+            padding: const EdgeInsets.only(right: 8.0),
             child: GestureDetector(
               onTap: () {
                 if (liveRecord.personal.profileImageBytes != null) {
@@ -310,11 +312,12 @@ class _HREmployeePortalPageState extends State<HREmployeePortalPage> {
                 }
               },
               child: CircleAvatar(
+                radius: 20,
                 backgroundImage: liveRecord.personal.profileImageBytes != null
                     ? MemoryImage(liveRecord.personal.profileImageBytes!)
                     : null,
                 child: liveRecord.personal.profileImageBytes == null
-                    ? const Icon(Icons.person_outline)
+                    ? const Icon(Icons.person_outline, size: 24)
                     : null,
               ),
             ),

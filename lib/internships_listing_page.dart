@@ -15,6 +15,13 @@ class _InternshipsListingPageState extends State<InternshipsListingPage> {
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    PostStore.I.fetchPosts();
+  }
+
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();

@@ -27,6 +27,8 @@ import 'services/auth_service.dart';
 import 'services/timesheet_service.dart';
 import 'services/compensation_service.dart';
 import 'services/faq_service.dart';
+import 'services/company_drive_service.dart';
+import 'services/employee_profile_service.dart';
 import 'state/app_session.dart';
 import 'state/employee_directory.dart';
 import 'services/alert_service.dart';
@@ -150,7 +152,15 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<EmployeeDirectory>(
           create: (_) => EmployeeDirectory(),
         ),
-        ChangeNotifierProvider<AlertService>(create: (_) => AlertService()),
+        ChangeNotifierProvider<AlertService>(
+          create: (_) => AlertService(),
+        ),
+        ChangeNotifierProvider<CompanyDriveService>(
+          create: (_) => CompanyDriveService(),
+        ),
+        ChangeNotifierProvider<EmployeeProfileService>(
+          create: (_) => EmployeeProfileService.instance..initialize(),
+        ),
         ChangeNotifierProvider<TimeSheetService>(
           create: (_) => TimeSheetService.instance..initialize(),
         ),

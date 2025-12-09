@@ -44,11 +44,20 @@ class EmployeeManagementService {
       // Verify HR access
       await _ensureHRAccess();
 
+      // Validate email pattern: strict name.x@domain (any domain)
+      // Allows: prasad.k@aex.com, mounika.p@mycompany.in
+      final emailRegex = RegExp(r'^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$');
+      if (!emailRegex.hasMatch(email)) {
+        return 'Email must follow the format: name.x@domain (e.g. prasad.k@company.com)';
+      }
+
       // Step 1: Create Supabase Auth user using signUp
+      // We pass 'is_hr_created' metadata so a trigger can auto-confirm the email
       final authResponse = await SupabaseConfig.client.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo: null, // No redirect needed for HR-created accounts
+        emailRedirectTo: null,
+        data: {'is_hr_created': true},
       );
 
       if (authResponse.user == null) {
@@ -57,49 +66,37 @@ class EmployeeManagementService {
 
       final newUserId = authResponse.user!.id;
 
-      try {
-        // Step 2: Assign employee role in user_roles table
-        await SupabaseConfig.client.from('user_roles').insert({
-          'id': newUserId,
-          'role': 'employee',
-          'email': email,
-        });
+      // Step 2: Call Secure Database Function to setup Role and Profile
+      // This bypasses all client-side RLS permission errors
+      final rpcResponse = await SupabaseConfig.client.rpc(
+        'setup_employee_data',
+        params: {
+          'p_auth_user_id': newUserId,
+          'p_email': email,
+          'p_name': name,
+          'p_employee_id': employeeId,
+          'p_hr_id': SupabaseConfig.client.auth.currentUser?.id,
+        },
+      );
 
-        // Step 3: Create employee record in employees table
-        final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
-        await SupabaseConfig.client.from('employees').insert({
-          'auth_user_id': newUserId,
-          'employee_id': employeeId,
-          'name': name,
-          'email': email,
-          'created_by': currentUserId,
-        });
+      debugPrint('Employee setup response: $rpcResponse');
 
+      if (rpcResponse['success'] == true) {
         debugPrint('Employee created successfully: $email');
         return null; // Success
-      } catch (e) {
-        debugPrint('Error during role/employee creation: $e');
-        
-        // Rollback: Try to delete the auth user if role/employee creation fails
-        // Note: Since we're not using admin API, we can't delete the user programmatically
-        // The user account will exist but won't have employee role/data
-        
-        // Check for specific errors
-        if (e.toString().contains('duplicate key') || e.toString().contains('unique constraint')) {
-          return 'Employee ID or email already exists';
-        }
-        
-        if (e.toString().contains('policy') || e.toString().contains('permission')) {
-          return 'Permission denied. Please ensure RLS policies are set up correctly.';
-        }
-        
-        return 'Failed to create employee record: ${e.toString()}';
+      } else {
+        return 'Failed to setup employee data: ${rpcResponse['error']}';
       }
+
+    } on AuthException catch (e) {
     } on AuthException catch (e) {
       debugPrint('Auth error: ${e.message}');
       // Handle Supabase Auth errors
-      if (e.message.contains('email')) {
-        return 'Email is already in use';
+      if (e.message.contains('invalid') && e.message.toLowerCase().contains('email')) {
+        return 'Invalid email domain. Please use a real email domain (e.g., gmail.com, outlook.com) or disable email confirmation in Supabase Settings → Authentication.';
+      }
+      if (e.message.contains('email') || e.message.contains('User already registered')) {
+        return 'This email address is already registered. Please use a different email.';
       }
       if (e.message.contains('password')) {
         return 'Password does not meet requirements (minimum 6 characters)';
@@ -127,7 +124,7 @@ class EmployeeManagementService {
       await _ensureHRAccess();
 
       final response = await SupabaseConfig.client
-          .from('employees')
+          .from('employee_profiles')
           .select()
           .order('created_at', ascending: false);
 
@@ -147,7 +144,7 @@ class EmployeeManagementService {
       await _ensureHRAccess();
 
       await SupabaseConfig.client
-          .from('employees')
+          .from('employee_profiles')
           .update(updates)
           .eq('employee_id', employeeId);
 
@@ -165,9 +162,9 @@ class EmployeeManagementService {
     try {
       await _ensureHRAccess();
 
-      // Delete from employees table (will cascade)
+      // Delete from employee_profiles table (will cascade)
       await SupabaseConfig.client
-          .from('employees')
+          .from('employee_profiles')
           .delete()
           .eq('auth_user_id', authUserId);
 

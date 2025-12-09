@@ -7,137 +7,20 @@ import '../data/post_store.dart';
 import '../data/support_store.dart';
 import '../data/application_store.dart';
 import '../services/alert_service.dart';
+import '../services/company_drive_service.dart';
 import '../state/employee_directory.dart';
 import 'hr_employee_portal_page.dart';
 import '../utils/document_picker.dart';
 import '../utils/document_viewer.dart';
 import '../utils/document_saver.dart';
 import '../services/employee_management_service.dart';
+import '../services/employee_profile_service.dart'; // Added for profile picture loading
+import 'package:go_router/go_router.dart';
+import '../services/auth_service.dart';
 
-enum _HRMenu {
-  overview,
-  queries,
-  alerts,
-  postJob,
-  postInternship,
-  employeeDetails,
-  companyDrive,
-}
+enum _HRMenu { overview, queries, alerts, jobs, internships, employeeDetails, companyDrive }
 
 // ========================= COMPANY DRIVE =========================
-class _DriveEntry {
-  String id;
-  String name;
-  bool isFolder;
-  DateTime createdAt;
-  _DriveEntry? parent;
-  List<_DriveEntry> children; // for folders
-  Uint8List? data; // for files
-  String? mimeType; // for files
-
-  _DriveEntry.folder({required this.name, this.parent})
-    : id = UniqueKey().toString(),
-      isFolder = true,
-      createdAt = DateTime.now(),
-      children = <_DriveEntry>[],
-      data = null,
-      mimeType = null;
-
-  _DriveEntry.file({
-    required this.name,
-    required this.data,
-    required this.mimeType,
-    this.parent,
-  }) : id = UniqueKey().toString(),
-       isFolder = false,
-       createdAt = DateTime.now(),
-       children = <_DriveEntry>[];
-}
-
-class _CompanyDriveState extends ChangeNotifier {
-  final _DriveEntry root = _DriveEntry.folder(name: 'My Drive');
-  final List<_DriveEntry> _path = [];
-  String _query = '';
-
-  _CompanyDriveState() {
-    _path.add(root);
-  }
-
-  List<_DriveEntry> get path => List.unmodifiable(_path);
-  _DriveEntry get current => _path.last;
-  String get query => _query;
-
-  void setQuery(String q) {
-    _query = q.trim();
-    notifyListeners();
-  }
-
-  void cd(_DriveEntry folder) {
-    if (!folder.isFolder) return;
-    _path.add(folder);
-    notifyListeners();
-  }
-
-  void upTo(int index) {
-    if (index < 0 || index >= _path.length) return;
-    _path.removeRange(index + 1, _path.length);
-    notifyListeners();
-  }
-
-  void createFolder(String name) {
-    if (name.trim().isEmpty) return;
-    final entry = _DriveEntry.folder(name: name.trim(), parent: current);
-    current.children.add(entry);
-    notifyListeners();
-  }
-
-  void uploadFile({
-    required String name,
-    required Uint8List data,
-    String? mimeType,
-  }) {
-    final entry = _DriveEntry.file(
-      name: name,
-      data: data,
-      mimeType: mimeType ?? 'application/octet-stream',
-      parent: current,
-    );
-    current.children.add(entry);
-    notifyListeners();
-  }
-
-  void rename(_DriveEntry entry, String newName) {
-    if (newName.trim().isEmpty) return;
-    entry.name = newName.trim();
-    notifyListeners();
-  }
-
-  void delete(_DriveEntry entry) {
-    final parent = entry.parent;
-    if (parent == null) return;
-    parent.children.remove(entry);
-    notifyListeners();
-  }
-
-  List<_DriveEntry> listVisible() {
-    if (_query.isEmpty) return List<_DriveEntry>.from(current.children);
-    final List<_DriveEntry> all = [];
-    void dfs(_DriveEntry e) {
-      if (!e.isFolder) {
-        if (e.name.toLowerCase().contains(_query.toLowerCase())) all.add(e);
-      } else {
-        if (e.name.toLowerCase().contains(_query.toLowerCase())) all.add(e);
-        for (final c in e.children) {
-          dfs(c);
-        }
-      }
-    }
-
-    dfs(root);
-    return all;
-  }
-}
-
 class _CompanyDriveModule extends StatefulWidget {
   const _CompanyDriveModule();
   @override
@@ -145,14 +28,10 @@ class _CompanyDriveModule extends StatefulWidget {
 }
 
 class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
-  late final _CompanyDriveState _state;
   final TextEditingController _search = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _state = _CompanyDriveState();
-  }
+  String _searchQuery = '';
+  String? _currentFolderId; // null = root
+  final List<String?> _pathIds = [null]; // Stack of folder IDs for navigation
 
   @override
   void dispose() {
@@ -160,27 +39,54 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
     super.dispose();
   }
 
-  IconData _iconFor(_DriveEntry e) {
-    if (e.isFolder) return Icons.folder;
-    final ext = e.name.split('.').last.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext))
-      return Icons.image_outlined;
+  IconData _iconFor(DriveItem item) {
+    if (item.isFolder) return Icons.folder;
+    final ext = item.name.split('.').last.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(ext)) return Icons.image_outlined;
     if (['pdf'].contains(ext)) return Icons.picture_as_pdf_outlined;
     if (['doc', 'docx', 'rtf'].contains(ext)) return Icons.description_outlined;
     if (['txt', 'md'].contains(ext)) return Icons.article_outlined;
     return Icons.insert_drive_file_outlined;
   }
 
-  Future<void> _onUpload() async {
+  Future<void> _onUpload(CompanyDriveService service) async {
     final doc = await pickDocument(context);
     if (!mounted || doc == null) return;
-    _state.uploadFile(name: doc.name, data: doc.data, mimeType: doc.type);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Uploaded ${doc.name}')));
+    
+    final result = await service.uploadFile(
+      name: doc.name,
+      data: doc.data,
+      mimeType: doc.type ?? 'application/octet-stream',
+      parentId: _currentFolderId,
+    );
+    
+    if (!mounted) return;
+    if (result != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Uploaded ${doc.name}')),
+      );
+      
+      // Automatically open the uploaded file
+      final opened = await openDocumentBytes(
+        bytes: doc.data,
+        fileName: doc.name,
+        mimeType: doc.type,
+      );
+      
+      if (!mounted) return;
+      if (!opened) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File uploaded but preview not available on this platform.')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload file')),
+      );
+    }
   }
 
-  Future<void> _onNewFolder() async {
+  Future<void> _onNewFolder(CompanyDriveService service) async {
     final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
@@ -209,15 +115,18 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
     );
     if (!mounted) return;
     if (name != null && name.isNotEmpty) {
-      _state.createFolder(name);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Folder "$name" created')));
+      final result = await service.createFolder(name: name, parentId: _currentFolderId);
+      if (!mounted) return;
+      if (result != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Folder "$name" created')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to create folder')));
+      }
     }
   }
 
-  Future<void> _rename(_DriveEntry entry) async {
-    final controller = TextEditingController(text: entry.name);
+  Future<void> _rename(CompanyDriveService service, DriveItem item) async {
+    final controller = TextEditingController(text: item.name);
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -245,19 +154,21 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
     );
     if (!mounted) return;
     if (name != null && name.isNotEmpty) {
-      _state.rename(entry, name);
+      await service.rename(item.id, name);
     }
   }
 
-  Future<void> _delete(_DriveEntry entry) async {
-    final isFolder = entry.isFolder;
-    final childCount = isFolder ? entry.children.length : 0;
+  Future<void> _delete(CompanyDriveService service, DriveItem item) async {
+    final isFolder = item.isFolder;
+    final children = service.getChildren(item.id);
+    final childCount = children.length;
+    
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete'),
         content: Text(
-          'Are you sure you want to delete "${entry.name}"${isFolder ? ' and its $childCount item(s)?' : '?'}',
+          'Are you sure you want to delete "${item.name}"${isFolder ? ' and its $childCount item(s)?' : '?'}',
         ),
         actions: [
           TextButton(
@@ -276,15 +187,18 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
       ),
     );
     if (!mounted) return;
-    if (ok == true) _state.delete(entry);
+    if (ok == true) {
+      await service.delete(item.id);
+    }
   }
 
-  Future<void> _download(_DriveEntry entry) async {
-    if (entry.isFolder || entry.data == null) return;
-    final saved = await saveDocumentBytes(
-      bytes: entry.data!,
-      fileName: entry.name,
-    );
+  Future<void> _download(CompanyDriveService service, DriveItem item) async {
+    if (item.isFolder) return;
+    
+    final data = await service.downloadFile(item);
+    if (data == null || !mounted) return;
+    
+    final saved = await saveDocumentBytes(bytes: data, fileName: item.name);
     if (!mounted) return;
     if (!saved) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -295,11 +209,16 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
     }
   }
 
-  Future<void> _openFile(_DriveEntry entry) async {
-    if (entry.isFolder || entry.data == null) return;
+  Future<void> _openFile(CompanyDriveService service, DriveItem item) async {
+    if (item.isFolder) return;
+    
+    final data = await service.downloadFile(item);
+    if (data == null || !mounted) return;
+    
     final opened = await openDocumentBytes(
-      bytes: entry.data!,
-      fileName: entry.name,
+      bytes: data,
+      fileName: item.name,
+      mimeType: item.mimeType,
     );
     if (!mounted) return;
     if (!opened) {
@@ -324,14 +243,63 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
     return '${size.toStringAsFixed(precision)} ${units[i]}';
   }
 
+  void _navigateToFolder(String? folderId) {
+    setState(() {
+      _currentFolderId = folderId;
+      // Update path stack
+      final index = _pathIds.indexOf(folderId);
+      if (index >= 0) {
+        // Going back in history
+        _pathIds.removeRange(index + 1, _pathIds.length);
+      } else {
+        // Going forward
+        _pathIds.add(folderId);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _state,
-      builder: (context, _) {
-        final items = _state.listVisible();
+    return Consumer<CompanyDriveService>(
+      builder: (context, service, child) {
+        if (service.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (service.error != null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error: ${service.error}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => service.fetchAll(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Get items to display
+        final items = _searchQuery.isEmpty
+            ? service.getChildren(_currentFolderId)
+            : service.search(_searchQuery);
+
+        // Build breadcrumb path
+        final pathItems = <DriveItem>[];
+        for (final id in _pathIds) {
+          if (id == null) continue;
+          final item = service.getById(id);
+          if (item != null) pathItems.add(item);
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Header
             Container(
@@ -363,7 +331,11 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                         width: 300,
                         child: TextField(
                           controller: _search,
-                          onChanged: _state.setQuery,
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value.trim();
+                            });
+                          },
                           decoration: InputDecoration(
                             isDense: true,
                             prefixIcon: const Icon(Icons.search),
@@ -376,13 +348,13 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
-                        onPressed: _onNewFolder,
+                        onPressed: () => _onNewFolder(service),
                         icon: const Icon(Icons.create_new_folder_outlined),
                         label: const Text('New Folder'),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
-                        onPressed: _onUpload,
+                        onPressed: () => _onUpload(service),
                         icon: const Icon(Icons.upload_file_outlined),
                         label: const Text('Upload'),
                         style: ElevatedButton.styleFrom(
@@ -398,32 +370,24 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        for (int i = 0; i < _state.path.length; i++) ...[
-                          InkWell(
-                            onTap: () => _state.upTo(i),
-                            child: Row(
-                              children: [
-                                if (i == 0)
-                                  const Icon(
-                                    Icons.home_outlined,
-                                    size: 18,
-                                    color: Color(0xFFFF782B),
-                                  ),
-                                if (i == 0) const SizedBox(width: 4),
-                                Text(
-                                  _state.path[i].name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
+                        InkWell(
+                          onTap: () => _navigateToFolder(null),
+                          child: Row(
+                            children: const [
+                              Icon(Icons.home_outlined, size: 18, color: Color(0xFFFF782B)),
+                              SizedBox(width: 4),
+                              Text('My Drive', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ],
                           ),
-                          if (i != _state.path.length - 1) ...[
-                            const SizedBox(width: 8),
-                            const Icon(Icons.chevron_right, size: 18),
-                            const SizedBox(width: 8),
-                          ],
+                        ),
+                        for (int i = 0; i < pathItems.length; i++) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.chevron_right, size: 18),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => _navigateToFolder(pathItems[i].id),
+                            child: Text(pathItems[i].name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          ),
                         ],
                       ],
                     ),
@@ -431,34 +395,24 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                 ],
               ),
             ),
-            // Content list
+            const SizedBox(height: 12),
+            // Content list with fixed height
             Container(
+              height: 400, // Fixed height instead of Expanded
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.shade300),
               ),
               child: items.isEmpty
-                  ? SizedBox(
-                      height: 160,
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.folder_open,
-                              size: 48,
-                              color: Colors.grey.shade300,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _state.query.isEmpty
-                                  ? 'This folder is empty'
-                                  : 'No results found',
-                              style: TextStyle(color: Colors.grey.shade600),
-                            ),
-                          ],
-                        ),
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.folder_open, size: 48, color: Colors.grey.shade300),
+                          const SizedBox(height: 6),
+                          Text(_searchQuery.isEmpty ? 'This folder is empty' : 'No results found', style: TextStyle(color: Colors.grey.shade600)),
+                        ],
                       ),
                     )
                   : Column(
@@ -489,141 +443,89 @@ class _CompanyDriveModuleState extends State<_CompanyDriveModule> {
                             ],
                           ),
                         ),
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) =>
-                              Divider(height: 1, color: Colors.grey.shade300),
-                          itemBuilder: (context, index) {
-                            final e = items[index];
-                            final isFolder = e.isFolder;
-                            final sizeText = isFolder
-                                ? '—'
-                                : _formatSize(e.data?.length ?? 0);
-                            final date = e.createdAt;
-                            final dateText =
-                                '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-                            return InkWell(
-                              onDoubleTap: () {
-                                if (isFolder) {
-                                  _state.cd(e);
-                                } else {
-                                  _openFile(e);
-                                }
-                              },
-                              child: Container(
-                                height: 48,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    // Name
-                                    Expanded(
-                                      flex: 6,
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            _iconFor(e),
-                                            color: isFolder
-                                                ? Colors.grey.shade700
-                                                : const Color(0xFFFF782B),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Text(
-                                              e.name,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                        Expanded(
+                          child: ListView.separated(
+                            itemCount: items.length,
+                            separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade300),
+                            itemBuilder: (context, index) {
+                              final item = items[index];
+                              final isFolder = item.isFolder;
+                              final sizeText = isFolder ? '—' : _formatSize(item.fileSize ?? 0);
+                              final date = item.updatedAt;
+                              final dateText = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                              return InkWell(
+                                onDoubleTap: () {
+                                  if (isFolder) {
+                                    _navigateToFolder(item.id);
+                                  } else {
+                                    _openFile(service, item);
+                                  }
+                                },
+                                child: Container(
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: Row(
+                                    children: [
+                                      // Name
+                                      Expanded(
+                                        flex: 6,
+                                        child: Row(
+                                          children: [
+                                            Icon(_iconFor(item), color: isFolder ? Colors.grey.shade700 : const Color(0xFFFF782B)),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                                             ),
-                                          ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Owner
+                                      const Expanded(flex: 2, child: Text('me')),
+                                      // Date modified
+                                      Expanded(flex: 3, child: Text(dateText)),
+                                      // File size
+                                      Expanded(flex: 2, child: Text(sizeText)),
+                                      // Menu
+                                      PopupMenuButton<String>(
+                                        tooltip: 'More',
+                                        icon: const Icon(Icons.more_vert),
+                                        onSelected: (v) {
+                                          switch (v) {
+                                            case 'open':
+                                              if (isFolder) {
+                                                _navigateToFolder(item.id);
+                                              } else {
+                                                _openFile(service, item);
+                                              }
+                                              break;
+                                            case 'download':
+                                              if (!isFolder) _download(service, item);
+                                              break;
+                                            case 'rename':
+                                              _rename(service, item);
+                                              break;
+                                            case 'delete':
+                                              _delete(service, item);
+                                              break;
+                                          }
+                                        },
+                                        itemBuilder: (ctx) => [
+                                          if (isFolder)
+                                            const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.folder_open), title: Text('Open'))),
+                                          if (!isFolder)
+                                            const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.open_in_new), title: Text('Open'))),
+                                          if (!isFolder)
+                                            const PopupMenuItem(value: 'download', child: ListTile(leading: Icon(Icons.download_outlined), title: Text('Download'))),
+                                          const PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.drive_file_rename_outline), title: Text('Rename'))),
+                                          const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline, color: Colors.red), title: Text('Delete'))),
                                         ],
                                       ),
-                                    ),
-                                    // Owner
-                                    const Expanded(flex: 2, child: Text('me')),
-                                    // Date modified
-                                    Expanded(flex: 3, child: Text(dateText)),
-                                    // File size
-                                    Expanded(flex: 2, child: Text(sizeText)),
-                                    // Menu
-                                    PopupMenuButton<String>(
-                                      tooltip: 'More',
-                                      icon: const Icon(Icons.more_vert),
-                                      onSelected: (v) {
-                                        switch (v) {
-                                          case 'open':
-                                            if (isFolder) {
-                                              _state.cd(e);
-                                            } else {
-                                              _openFile(e);
-                                            }
-                                            break;
-                                          case 'download':
-                                            if (!isFolder) _download(e);
-                                            break;
-                                          case 'rename':
-                                            _rename(e);
-                                            break;
-                                          case 'delete':
-                                            _delete(e);
-                                            break;
-                                        }
-                                      },
-                                      itemBuilder: (ctx) => [
-                                        if (isFolder)
-                                          const PopupMenuItem(
-                                            value: 'open',
-                                            child: ListTile(
-                                              leading: Icon(Icons.folder_open),
-                                              title: Text('Open'),
-                                            ),
-                                          ),
-                                        if (!isFolder)
-                                          const PopupMenuItem(
-                                            value: 'open',
-                                            child: ListTile(
-                                              leading: Icon(Icons.open_in_new),
-                                              title: Text('Open'),
-                                            ),
-                                          ),
-                                        if (!isFolder)
-                                          const PopupMenuItem(
-                                            value: 'download',
-                                            child: ListTile(
-                                              leading: Icon(
-                                                Icons.download_outlined,
-                                              ),
-                                              title: Text('Download'),
-                                            ),
-                                          ),
-                                        const PopupMenuItem(
-                                          value: 'rename',
-                                          child: ListTile(
-                                            leading: Icon(
-                                              Icons.drive_file_rename_outline,
-                                            ),
-                                            title: Text('Rename'),
-                                          ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'delete',
-                                          child: ListTile(
-                                            leading: Icon(
-                                              Icons.delete_outline,
-                                              color: Colors.red,
-                                            ),
-                                            title: Text('Delete'),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -642,17 +544,20 @@ class _AlertsModule extends StatefulWidget {
 }
 
 class _AlertsModuleState extends State<_AlertsModule> {
-  late final TextEditingController _controller;
+  late final TextEditingController _titleController;
+  late final TextEditingController _messageController;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController();
+    _titleController = TextEditingController();
+    _messageController = TextEditingController();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _titleController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
@@ -660,6 +565,11 @@ class _AlertsModuleState extends State<_AlertsModule> {
   Widget build(BuildContext context) {
     final alertService = context.watch<AlertService>();
     final alerts = alertService.alerts;
+    
+    if (alertService.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -695,7 +605,15 @@ class _AlertsModuleState extends State<_AlertsModule> {
                 ),
                 const SizedBox(height: 10),
                 TextField(
-                  controller: _controller,
+                  controller: _titleController,
+                  decoration: InputDecoration(
+                    hintText: 'Alert Title',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _messageController,
                   maxLines: 3,
                   decoration: InputDecoration(
                     hintText:
@@ -710,11 +628,21 @@ class _AlertsModuleState extends State<_AlertsModule> {
                   children: [
                     ElevatedButton.icon(
                       onPressed: () {
-                        context.read<AlertService>().add(_controller.text);
-                        _controller.clear();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Alert added')),
-                        );
+                        if (_titleController.text.isNotEmpty && _messageController.text.isNotEmpty) {
+                          context.read<AlertService>().add(
+                                _titleController.text.trim(),
+                                _messageController.text.trim(),
+                              );
+                          _titleController.clear();
+                          _messageController.clear();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Alert added')),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter both title and message')),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.add_alert_outlined),
                       label: const Text('Add Alert'),
@@ -729,11 +657,7 @@ class _AlertsModuleState extends State<_AlertsModule> {
                           ? null
                           : () {
                               context.read<AlertService>().clearAll();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('All alerts cleared'),
-                                ),
-                              );
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All alerts cleared locally')));
                             },
                       icon: const Icon(Icons.delete_sweep_outlined),
                       label: const Text('Clear All'),
@@ -772,38 +696,41 @@ class _AlertsModuleState extends State<_AlertsModule> {
                     style: TextStyle(color: Colors.grey.shade700),
                   )
                 else
-                  ...alerts.map(
-                    (a) => Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text(a.text)),
-                          Switch(
-                            value: a.active,
-                            activeThumbColor: const Color(0xFFFF782B),
-                            onChanged: (v) => context
-                                .read<AlertService>()
-                                .toggleActive(a.id, v),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete',
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
+                  ...alerts.map((a) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    a.title,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                Switch(
+                                  value: a.active,
+                                  activeThumbColor: const Color(0xFFFF782B),
+                                  onChanged: (v) => context.read<AlertService>().toggleActive(a.id, v),
+                                ),
+                                IconButton(
+                                  tooltip: 'Delete',
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  onPressed: () => context.read<AlertService>().remove(a.id),
+                                ),
+                              ],
                             ),
-                            onPressed: () =>
-                                context.read<AlertService>().remove(a.id),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                            Text(a.text),
+                          ],
+                        ),
+                      )),
               ],
             ),
           ),
@@ -1030,6 +957,107 @@ class _EmployeeDetailsModule extends StatefulWidget {
 
 class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
   final _EmployeeDetailsData _data = _EmployeeDetailsData();
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmployeesFromSupabase();
+  }
+
+  Future<void> _loadEmployeesFromSupabase() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Fetch all employees from Supabase
+      final employees = await EmployeeManagementService.instance.getEmployees();
+      
+      // Load each employee's full profile (including profile picture)
+      for (final emp in employees) {
+        final employeeId = emp['employee_id'] ?? '';
+        final fullName = emp['full_name'] ?? '';
+        final email = emp['corporate_email'] ?? '';
+        
+        // Add to local HR list
+        final record = _EmployeeRecord(
+          id: employeeId,
+          name: fullName,
+          email: email,
+          password: '********', // Password not returned from DB for security
+          profile: _EmployeeProfileData.empty(),
+        );
+        _data.addEmployee(record);
+        
+        // Load full profile with profile picture using EmployeeProfileService
+        final globalRecord = await EmployeeProfileService.instance.loadEmployeeProfileById(employeeId);
+        
+        // Add to global directory if loaded successfully
+        if (globalRecord != null && mounted) {
+          context.read<EmployeeDirectory>().addEmployee(globalRecord);
+          debugPrint('Loaded profile for $employeeId with picture: ${globalRecord.personal.profileImageBytes != null}');
+        } else if (mounted) {
+          // Fallback: create basic record without profile picture
+          debugPrint('Could not load full profile for $employeeId, using basic data');
+          final fallbackRecord = EmployeeRecord(
+            id: employeeId,
+            name: fullName,
+            primaryEmail: email,
+            personal: EmployeePersonalDetails(
+              fullName: fullName,
+              familyName: emp['family_name'] ?? '',
+              corporateEmail: email,
+              personalEmail: emp['personal_email'] ?? '',
+              mobileNumber: emp['mobile_number'] ?? '',
+              alternateMobileNumber: emp['alternate_mobile_number'] ?? '',
+              currentAddress: emp['current_address'] ?? '',
+              permanentAddress: emp['permanent_address'] ?? '',
+              panId: emp['pan_id'] ?? '',
+              aadharId: emp['aadhar_id'] ?? '',
+              dateOfBirth: emp['date_of_birth'] != null 
+                  ? DateTime.parse(emp['date_of_birth']) 
+                  : null,
+              bloodGroup: emp['blood_group'] ?? '',
+              otherAssets: '',
+              profileImageBytes: null,
+              assignedAssets: <String>{},
+            ),
+            professional: EmployeeProfessionalProfile(
+              position: emp['position'] ?? '',
+              employeeId: employeeId,
+              department: emp['department'] ?? '',
+              managerName: emp['manager_name'] ?? '',
+              employmentType: emp['employment_type'] ?? '',
+              location: emp['location'] ?? '',
+              workSpace: emp['workspace'] ?? '',
+              jobLevel: emp['job_level'] ?? '',
+              startDate: emp['start_date'] != null 
+                  ? DateTime.parse(emp['start_date']) 
+                  : null,
+              confirmationDate: emp['confirmation_date'] != null 
+                  ? DateTime.parse(emp['confirmation_date']) 
+                  : null,
+              skills: emp['skills'] ?? '',
+            ),
+          );
+          context.read<EmployeeDirectory>().addEmployee(fallbackRecord);
+        }
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading employees from Supabase: $e');
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load employees: $e';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1156,23 +1184,6 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                   ),
                   SizedBox(
                     height: 540,
-                    child: _EmployeeListView(
-                      employees: _data.employees,
-                      onView: (record) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                ChangeNotifierProvider<EmployeeDirectory>.value(
-                                  value: context.read<EmployeeDirectory>()
-                                    ..setPrimaryEmployee(record.id),
-                                  child: HREmployeePortalPage(
-                                    employeeId: record.id,
-                                  ),
-                                ),
-                          ),
-                        );
-                      },
-                      onEdit: (record) async {
                         final updatedRecord = await showDialog<_EmployeeRecord>(
                           context: context,
                           builder: (context) =>
@@ -1229,6 +1240,96 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                       },
                       showTitle: false,
                     ),
+=======
+                    child: _isLoading
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF782B)),
+                                ),
+                                SizedBox(height: 16),
+                                Text('Loading employees from database...'),
+                              ],
+                            ),
+                          )
+                        : _errorMessage != null
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                    const SizedBox(height: 16),
+                                    Text(_errorMessage!, textAlign: TextAlign.center),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton.icon(
+                                      onPressed: _loadEmployeesFromSupabase,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Retry'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFFFF782B),
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : _EmployeeListView(
+                                employees: _data.employees,
+                                onView: (record) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => ChangeNotifierProvider<EmployeeDirectory>.value(
+                                        value: context.read<EmployeeDirectory>()..setPrimaryEmployee(record.id),
+                                        child: HREmployeePortalPage(employeeId: record.id),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                onEdit: (record) async {
+                                  final updatedRecord = await showDialog<_EmployeeRecord>(
+                                    context: context,
+                                    builder: (context) => _EditEmployeeDialog(employee: record),
+                                  );
+                                  if (!context.mounted) return;
+                                  if (updatedRecord != null) {
+                                    _data.updateEmployee(record, updatedRecord);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Employee "${updatedRecord.name}" updated.')),
+                                    );
+                                  }
+                                },
+                                onDelete: (record) async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Delete Employee'),
+                                      content: Text('Are you sure you want to delete ${record.name}?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(context).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => Navigator.of(context).pop(true),
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (!context.mounted) return;
+                                  if (confirmed == true) {
+                                    _data.removeEmployee(record);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Employee "${record.name}" deleted.')),
+                                    );
+                                  }
+                                },
+                                showTitle: false,
+                              ),
+>>>>>>> 02c5e94 (Database connecting)
                   ),
                 ],
               ),
@@ -1390,9 +1491,20 @@ class _CreateEmployeeFormState extends State<_CreateEmployeeForm> {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter the employee email';
                 }
-                final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                if (!emailRegex.hasMatch(value.trim())) {
-                  return 'Please enter a valid email address';
+                final email = value.trim();
+                // Validation: match name.initial@domain.tld
+                // Allows: prasad.k@aex.com, mounika.p@mycompany.in, etc.
+                final emailRegex = RegExp(r'^[a-zA-Z0-9]+\.[a-zA-Z0-9]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$');
+                
+                if (!emailRegex.hasMatch(email)) {
+                  // Fallback to basic email check to give clearer error
+                  if (!email.contains('@')) {
+                    return 'Please enter a valid email address';
+                  }
+                  if (!email.contains('.')) {
+                    return 'Email must follow format: name.initial@domain (e.g. prasad.k@company.com)';
+                  }
+                  return 'Email format must be: name.x@domain (e.g. rahul.k@company.com)';
                 }
                 return null;
               },
@@ -1870,6 +1982,485 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
   }
 }
 
+// ========================= JOBS SUBMENU =========================
+enum _JobsSubmenu { postJob, jobPosts, jobApplications }
+
+class _JobsSubmenuWidget extends StatefulWidget {
+  const _JobsSubmenuWidget();
+
+  @override
+  State<_JobsSubmenuWidget> createState() => _JobsSubmenuWidgetState();
+}
+
+class _JobsSubmenuWidgetState extends State<_JobsSubmenuWidget> {
+  _JobsSubmenu _selectedSubmenu = _JobsSubmenu.jobPosts;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Submenu options
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: _SubmenuCard(
+                  icon: Icons.add_circle_outline,
+                  title: 'Post a Job',
+                  description: 'Create a new job posting',
+                  isSelected: _selectedSubmenu == _JobsSubmenu.postJob,
+                  onTap: () => setState(() => _selectedSubmenu = _JobsSubmenu.postJob),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SubmenuCard(
+                  icon: Icons.work_outline,
+                  title: 'Job Posts',
+                  description: 'View and manage all job posts',
+                  isSelected: _selectedSubmenu == _JobsSubmenu.jobPosts,
+                  onTap: () => setState(() => _selectedSubmenu = _JobsSubmenu.jobPosts),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SubmenuCard(
+                  icon: Icons.people_outline,
+                  title: 'Applications',
+                  description: 'Review job applications',
+                  isSelected: _selectedSubmenu == _JobsSubmenu.jobApplications,
+                  onTap: () => setState(() => _selectedSubmenu = _JobsSubmenu.jobApplications),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Content based on selection
+        _buildContent(),
+      ],
+    );
+  }
+
+  Widget _buildContent() {
+    switch (_selectedSubmenu) {
+      case _JobsSubmenu.postJob:
+        return const _PostJobModule();
+      case _JobsSubmenu.jobPosts:
+        return const _JobPostsModule();
+      case _JobsSubmenu.jobApplications:
+        return const _JobApplicationsModule();
+    }
+  }
+}
+
+// ========================= INTERNSHIPS SUBMENU =========================
+enum _InternshipsSubmenu { postInternship, internshipPosts, internshipApplications }
+
+class _InternshipsSubmenuWidget extends StatefulWidget {
+  const _InternshipsSubmenuWidget();
+
+  @override
+  State<_InternshipsSubmenuWidget> createState() => _InternshipsSubmenuWidgetState();
+}
+
+class _InternshipsSubmenuWidgetState extends State<_InternshipsSubmenuWidget> {
+  _InternshipsSubmenu _selectedSubmenu = _InternshipsSubmenu.internshipPosts;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Submenu options
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: _SubmenuCard(
+                  icon: Icons.add_circle_outline,
+                  title: 'Post an Internship',
+                  description: 'Create a new internship posting',
+                  isSelected: _selectedSubmenu == _InternshipsSubmenu.postInternship,
+                  onTap: () => setState(() => _selectedSubmenu = _InternshipsSubmenu.postInternship),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SubmenuCard(
+                  icon: Icons.school_outlined,
+                  title: 'Internship Posts',
+                  description: 'View and manage all internship posts',
+                  isSelected: _selectedSubmenu == _InternshipsSubmenu.internshipPosts,
+                  onTap: () => setState(() => _selectedSubmenu = _InternshipsSubmenu.internshipPosts),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SubmenuCard(
+                  icon: Icons.people_outline,
+                  title: 'Applications',
+                  description: 'Review internship applications',
+                  isSelected: _selectedSubmenu == _InternshipsSubmenu.internshipApplications,
+                  onTap: () => setState(() => _selectedSubmenu = _InternshipsSubmenu.internshipApplications),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Content based on selection
+        _buildContent(),
+      ],
+    );
+  }
+
+  Widget _buildContent() {
+    switch (_selectedSubmenu) {
+      case _InternshipsSubmenu.postInternship:
+        return const _PostInternshipModule();
+      case _InternshipsSubmenu.internshipPosts:
+        return const _InternshipPostsModule();
+      case _InternshipsSubmenu.internshipApplications:
+        return const _InternshipApplicationsModule();
+    }
+  }
+}
+
+// Submenu Card Widget
+class _SubmenuCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SubmenuCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFF782B).withValues(alpha: 0.1) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFFF782B) : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 48,
+              color: isSelected ? const Color(0xFFFF782B) : Colors.grey.shade600,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? const Color(0xFFFF782B) : Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ========================= POST JOB MODULE =========================
+class _PostJobModule extends StatelessWidget {
+  const _PostJobModule();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: const _PostJobFormInline(),
+    );
+  }
+}
+
+// ========================= JOB POSTS MODULE =========================
+class _JobPostsModule extends StatefulWidget {
+  const _JobPostsModule();
+
+  @override
+  State<_JobPostsModule> createState() => _JobPostsModuleState();
+}
+
+class _JobPostsModuleState extends State<_JobPostsModule> {
+  Future<void> _openPostJobDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: const _PostJobFormInline(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double listHeight = MediaQuery.of(context).size.height - 300;
+    if (listHeight < 400) listHeight = 400;
+    if (listHeight > 900) listHeight = 900;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.work_outline, color: Color(0xFFFF782B), size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'All Job Posts',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: _openPostJobDialog,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Post Job'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFF782B),
+                    side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: listHeight,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _JobPostsList(onEdit: (job) => _openPostJobDialog()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ========================= JOB APPLICATIONS MODULE =========================
+class _JobApplicationsModule extends StatefulWidget {
+  const _JobApplicationsModule();
+
+  @override
+  State<_JobApplicationsModule> createState() => _JobApplicationsModuleState();
+}
+
+class _JobApplicationsModuleState extends State<_JobApplicationsModule> {
+  static const int _itemsPerPage = 10;
+  int _currentPage = 0;
+
+  void _downloadResume(BuildContext context, String fileName, String? resumeData) {
+    if (resumeData != null && resumeData.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Downloading $fileName...')),
+      );
+      // TODO: Implement actual file download using dart:html for web or file_saver package
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Resume data not available')),
+      );
+    }
+  }
+
+  Future<void> _deleteApplication(BuildContext context, String email, String jobId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Application'),
+        content: Text('Are you sure you want to delete the application from $email?\n\nThis action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (!context.mounted) return;
+    if (confirmed != true) return;
+    final success = await ApplicationStore.I.deleteJobApplication(email, jobId);
+    if (!context.mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Application deleted successfully')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double listHeight = MediaQuery.of(context).size.height - 300;
+    if (listHeight < 400) listHeight = 400;
+    if (listHeight > 900) listHeight = 900;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.people_outline, color: Color(0xFFFF782B), size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Job Applications',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: listHeight,
+                child: _JobApplicationsList(
+                  currentPage: _currentPage,
+                  itemsPerPage: _itemsPerPage,
+                  onDownload: _downloadResume,
+                  onDelete: _deleteApplication,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _currentPage > 0 || ApplicationStore.I.jobApplications.length > _itemsPerPage
+            ? _PaginationControls(
+                currentPage: _currentPage,
+                totalPages: (ApplicationStore.I.jobApplications.length / _itemsPerPage).ceil(),
+                onPageChanged: (page) {
+                  setState(() => _currentPage = page);
+                },
+              )
+            : const SizedBox.shrink(),
+      ],
+    );
+  }
+}
+
+// Keep the old _JobsModule for backward compatibility (can be removed later)
 class _JobsModule extends StatefulWidget {
   const _JobsModule();
 
@@ -1929,7 +2520,7 @@ class _JobsModuleState extends State<_JobsModule> {
 
     if (!context.mounted) return;
     if (confirmed != true) return;
-    final success = ApplicationStore.I.deleteJobApplication(email, jobId);
+    final success = await ApplicationStore.I.deleteJobApplication(email, jobId);
     if (!context.mounted) return;
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1955,6 +2546,316 @@ class _JobsModuleState extends State<_JobsModule> {
   Widget build(BuildContext context) {
     double listHeight = MediaQuery.of(context).size.height - 360;
     if (listHeight < 320) listHeight = 320;
+    if (listHeight > 900) listHeight = 900;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Side-by-side layout: Job Posts (left) and Applications (right)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Left Column: Job Posts
+            Expanded(
+              flex: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.work_outline, color: Color(0xFFFF782B), size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Job Posts',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
+                          const Spacer(),
+                          OutlinedButton.icon(
+                            onPressed: _openPostJobDialog,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Post Job'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFFF782B),
+                              side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: listHeight,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: _JobPostsList(onEdit: (job) => _openPostJobDialog()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Right Column: Applications
+            Expanded(
+              flex: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.people_outline, color: Color(0xFFFF782B), size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Job Applications',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: listHeight,
+                      child: _JobApplicationsList(
+                        currentPage: _currentPage,
+                        itemsPerPage: _itemsPerPage,
+                        onDownload: _downloadResume,
+                        onDelete: _deleteApplication,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _currentPage > 0 || ApplicationStore.I.jobApplications.length > _itemsPerPage
+            ? _PaginationControls(
+                currentPage: _currentPage,
+                totalPages: (ApplicationStore.I.jobApplications.length / _itemsPerPage).ceil(),
+                onPageChanged: (page) {
+                  setState(() => _currentPage = page);
+                },
+              )
+            : const SizedBox.shrink(),
+      ],
+    );
+  }
+}
+
+// ========================= POST INTERNSHIP MODULE =========================
+class _PostInternshipModule extends StatelessWidget {
+  const _PostInternshipModule();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: const _PostInternshipFormInline(),
+    );
+  }
+}
+
+// ========================= INTERNSHIP POSTS MODULE =========================
+class _InternshipPostsModule extends StatefulWidget {
+  const _InternshipPostsModule();
+
+  @override
+  State<_InternshipPostsModule> createState() => _InternshipPostsModuleState();
+}
+
+class _InternshipPostsModuleState extends State<_InternshipPostsModule> {
+  Future<void> _openPostInternshipDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: const _PostInternshipFormInline(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double listHeight = MediaQuery.of(context).size.height - 300;
+    if (listHeight < 400) listHeight = 400;
+    if (listHeight > 900) listHeight = 900;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.school_outlined, color: Color(0xFFFF782B), size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'All Internship Posts',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: _openPostInternshipDialog,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Post Internship'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFF782B),
+                    side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: listHeight,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _InternshipPostsList(onEdit: (internship) => _openPostInternshipDialog()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ========================= INTERNSHIP APPLICATIONS MODULE =========================
+class _InternshipApplicationsModule extends StatefulWidget {
+  const _InternshipApplicationsModule();
+
+  @override
+  State<_InternshipApplicationsModule> createState() => _InternshipApplicationsModuleState();
+}
+
+class _InternshipApplicationsModuleState extends State<_InternshipApplicationsModule> {
+  static const int _itemsPerPage = 10;
+  int _currentPage = 0;
+
+  void _downloadResume(BuildContext context, String fileName, String? resumeData) {
+    if (resumeData != null && resumeData.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Downloading $fileName...')),
+      );
+      // TODO: Implement actual file download using dart:html for web or file_saver package
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Resume data not available')),
+      );
+    }
+  }
+
+  Future<void> _deleteApplication(BuildContext context, String email, String internshipId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Application'),
+        content: Text('Are you sure you want to delete the application from $email?\n\nThis action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (!context.mounted) return;
+    if (confirmed != true) return;
+    final success = await ApplicationStore.I.deleteInternshipApplication(email, internshipId);
+    if (!context.mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Application deleted successfully')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double listHeight = MediaQuery.of(context).size.height - 300;
+    if (listHeight < 400) listHeight = 400;
     if (listHeight > 900) listHeight = 900;
 
     return Column(
@@ -1992,35 +2893,18 @@ class _JobsModuleState extends State<_JobsModule> {
                 ),
                 child: Row(
                   children: [
+                    const Icon(Icons.people_outline, color: Color(0xFFFF782B), size: 20),
+                    const SizedBox(width: 8),
                     const Text(
-                      'Job Applications',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Spacer(),
-                    OutlinedButton.icon(
-                      onPressed: _openPostJobDialog,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Post Job'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFFF782B),
-                        side: BorderSide(
-                          color: const Color(0xFFFF782B).withValues(alpha: 0.6),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                      ),
+                      'Internship Applications',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
               ),
               SizedBox(
                 height: listHeight,
-                child: _JobApplicationsList(
+                child: _InternshipApplicationsList(
                   currentPage: _currentPage,
                   itemsPerPage: _itemsPerPage,
                   onDownload: _downloadResume,
@@ -2031,13 +2915,10 @@ class _JobsModuleState extends State<_JobsModule> {
           ),
         ),
         const SizedBox(height: 12),
-        _currentPage > 0 ||
-                ApplicationStore.I.jobApplications.length > _itemsPerPage
+        _currentPage > 0 || ApplicationStore.I.internshipApplications.length > _itemsPerPage
             ? _PaginationControls(
                 currentPage: _currentPage,
-                totalPages:
-                    (ApplicationStore.I.jobApplications.length / _itemsPerPage)
-                        .ceil(),
+                totalPages: (ApplicationStore.I.internshipApplications.length / _itemsPerPage).ceil(),
                 onPageChanged: (page) {
                   setState(() => _currentPage = page);
                 },
@@ -2048,6 +2929,7 @@ class _JobsModuleState extends State<_JobsModule> {
   }
 }
 
+// Keep the old _InternshipsModule for backward compatibility (can be removed later)
 class _InternshipsModule extends StatefulWidget {
   const _InternshipsModule();
 
@@ -2107,10 +2989,7 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
 
     if (!context.mounted) return;
     if (confirmed != true) return;
-    final success = ApplicationStore.I.deleteInternshipApplication(
-      email,
-      internshipId,
-    );
+    final success = await ApplicationStore.I.deleteInternshipApplication(email, internshipId);
     if (!context.mounted) return;
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2141,75 +3020,121 @@ class _InternshipsModuleState extends State<_InternshipsModule> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+        // Side-by-side layout: Internship Posts (left) and Applications (right)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Left Column: Internship Posts
+            Expanded(
+              flex: 1,
+              child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade300),
-                  ),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Internship Applications',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.school_outlined, color: Color(0xFFFF782B), size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Internship Posts',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
+                          const Spacer(),
+                          OutlinedButton.icon(
+                            onPressed: _openPostInternshipDialog,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Post Internship'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFFF782B),
+                              side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const Spacer(),
-                    OutlinedButton.icon(
-                      onPressed: _openPostInternshipDialog,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Post Internship'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFFF782B),
-                        side: BorderSide(
-                          color: const Color(0xFFFF782B).withValues(alpha: 0.6),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
+                    SizedBox(
+                      height: listHeight,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: _InternshipPostsList(onEdit: (internship) => _openPostInternshipDialog()),
                       ),
                     ),
                   ],
                 ),
               ),
-              SizedBox(
-                height: listHeight,
-                child: _InternshipApplicationsList(
-                  currentPage: _currentPage,
-                  itemsPerPage: _itemsPerPage,
-                  onDownload: _downloadResume,
-                  onDelete: _deleteApplication,
+            ),
+            const SizedBox(width: 16),
+            // Right Column: Applications
+            Expanded(
+              flex: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.people_outline, color: Color(0xFFFF782B), size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Internship Applications',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: listHeight,
+                      child: _InternshipApplicationsList(
+                        currentPage: _currentPage,
+                        itemsPerPage: _itemsPerPage,
+                        onDownload: _downloadResume,
+                        onDelete: _deleteApplication,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         _currentPage > 0 ||
@@ -2520,6 +3445,297 @@ class _InternshipApplicationsList extends StatelessWidget {
     );
   }
 }
+
+// Widget to display all job posts
+class _JobPostsList extends StatelessWidget {
+  final Function(JobPost) onEdit;
+
+  const _JobPostsList({required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: PostStore.I,
+      builder: (context, _) {
+        final jobs = PostStore.I.jobs;
+
+        if (jobs.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.work_outline, size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No job posts yet',
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Click "Post Job" to create your first job posting',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: jobs.length,
+          separatorBuilder: (_, __) => const Divider(height: 16),
+          itemBuilder: (context, index) {
+            final job = jobs[index];
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          job.title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${job.referenceCode ?? job.id} • ${job.department} • ${job.location}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Posted: ${job.postingDate} • Deadline: ${job.applicationDeadline}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => onEdit(job),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFF782B),
+                      side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Delete Job Post'),
+                          content: Text('Are you sure you want to delete "${job.title}"?\n\nThis action cannot be undone.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true && context.mounted) {
+                        final success = await PostStore.I.deleteJob(job.id);
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Job post deleted successfully')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Delete'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: BorderSide(color: Colors.red.withValues(alpha: 0.6)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// Widget to display all internship posts
+class _InternshipPostsList extends StatelessWidget {
+  final Function(InternshipPost) onEdit;
+
+  const _InternshipPostsList({required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: PostStore.I,
+      builder: (context, _) {
+        final internships = PostStore.I.internships;
+
+        if (internships.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.school_outlined, size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No internship posts yet',
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Click "Post Internship" to create your first internship posting',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: internships.length,
+          separatorBuilder: (_, __) => const Divider(height: 16),
+          itemBuilder: (context, index) {
+            final internship = internships[index];
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          internship.title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${internship.referenceCode ?? internship.id} • ${internship.duration} • ${internship.skill}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Posted: ${internship.postingDate}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => onEdit(internship),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFF782B),
+                      side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Delete Internship Post'),
+                          content: Text('Are you sure you want to delete "${internship.title}"?\n\nThis action cannot be undone.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true && context.mounted) {
+                        final success = await PostStore.I.deleteInternship(internship.id);
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Internship post deleted successfully')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Delete'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: BorderSide(color: Colors.red.withValues(alpha: 0.6)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 
 class _ApplicationCard extends StatelessWidget {
   final String email;
@@ -2934,6 +4150,15 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
   _HRMenu _selected = _HRMenu.overview; // initial: overview/welcome
 
   @override
+  void initState() {
+    super.initState();
+    // Fetch data from Supabase
+    PostStore.I.fetchPosts();
+    ApplicationStore.I.fetchApplications();
+  }
+
+
+  @override
   Widget build(BuildContext context) {
     final hasActive = context.watch<AlertService>().hasActive;
     return MultiProvider(
@@ -2982,6 +4207,16 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+            ),
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: () async {
+                await AuthService.instance.signOut();
+                if (context.mounted) context.go('/login/hr');
+              },
+              icon: const Icon(Icons.logout, color: Colors.white),
+              label: const Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               style: TextButton.styleFrom(foregroundColor: Colors.white),
             ),
             const SizedBox(width: 8),
@@ -3072,20 +4307,17 @@ class _Sidebar extends StatelessWidget {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.work_outline, color: Color(0xFFFF782B)),
-            title: const Text('Jobs'),
-            selected: selected == _HRMenu.postJob,
-            onTap: () => onSelect(_HRMenu.postJob),
-          ),
-          ListTile(
-            leading: const Icon(
-              Icons.school_outlined,
-              color: Color(0xFFFF782B),
-            ),
-            title: const Text('Internships'),
-            selected: selected == _HRMenu.postInternship,
-            onTap: () => onSelect(_HRMenu.postInternship),
-          ),
+          leading: const Icon(Icons.work_outline, color: Color(0xFFFF782B)),
+          title: const Text('Jobs'),
+          selected: selected == _HRMenu.jobs,
+          onTap: () => onSelect(_HRMenu.jobs),
+        ),
+        ListTile(
+          leading: const Icon(Icons.school_outlined, color: Color(0xFFFF782B)),
+          title: const Text('Internships'),
+          selected: selected == _HRMenu.internships,
+          onTap: () => onSelect(_HRMenu.internships),
+        ),
           ListTile(
             leading: const Icon(Icons.people_outline, color: Color(0xFFFF782B)),
             title: const Text('Employee Details'),
@@ -3154,15 +4386,15 @@ class _TopNav extends StatelessWidget {
           ),
           const Spacer(),
           TextButton.icon(
-            onPressed: () => onSelect(_HRMenu.postJob),
-            icon: const Icon(Icons.work_outline, color: Color(0xFFFF782B)),
-            label: const Text('Jobs'),
-          ),
-          TextButton.icon(
-            onPressed: () => onSelect(_HRMenu.postInternship),
-            icon: const Icon(Icons.school_outlined, color: Color(0xFFFF782B)),
-            label: const Text('Internships'),
-          ),
+          onPressed: () => onSelect(_HRMenu.jobs),
+          icon: const Icon(Icons.work_outline, color: Color(0xFFFF782B)),
+          label: const Text('Jobs'),
+        ),
+        TextButton.icon(
+          onPressed: () => onSelect(_HRMenu.internships),
+          icon: const Icon(Icons.school_outlined, color: Color(0xFFFF782B)),
+          label: const Text('Internships'),
+        ),
           TextButton.icon(
             onPressed: () => onSelect(_HRMenu.employeeDetails),
             icon: const Icon(Icons.people_outline, color: Color(0xFFFF782B)),
@@ -3196,11 +4428,11 @@ class _RightPanel extends StatelessWidget {
       case _HRMenu.alerts:
         child = const _AlertsModule();
         break;
-      case _HRMenu.postJob:
-        child = const _JobsModule();
+      case _HRMenu.jobs:
+        child = const _JobsSubmenuWidget();
         break;
-      case _HRMenu.postInternship:
-        child = const _InternshipsModule();
+      case _HRMenu.internships:
+        child = const _InternshipsSubmenuWidget();
         break;
       case _HRMenu.employeeDetails:
         child = const _EmployeeDetailsModule();
@@ -3703,13 +4935,13 @@ class _QuickActions extends StatelessWidget {
             _QuickActionButton(
               icon: Icons.work_outline,
               label: 'Post New Job',
-              onTap: () => onSelect(_HRMenu.postJob),
+              onTap: () => onSelect(_HRMenu.jobs),
             ),
             const SizedBox(height: 8),
             _QuickActionButton(
               icon: Icons.school_outlined,
               label: 'Post Internship',
-              onTap: () => onSelect(_HRMenu.postInternship),
+              onTap: () => onSelect(_HRMenu.internships),
             ),
             const SizedBox(height: 8),
             _QuickActionButton(
@@ -3783,43 +5015,170 @@ class _QuickActionButton extends StatelessWidget {
   }
 }
 
-class _QueriesList extends StatelessWidget {
+class _QueriesList extends StatefulWidget {
   const _QueriesList();
+
+  @override
+  State<_QueriesList> createState() => _QueriesListState();
+}
+
+class _QueriesListState extends State<_QueriesList> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch queries when this view is opened
+    SupportStore.I.fetchQueries();
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'resolved':
+        return Colors.green;
+      case 'in_progress':
+        return Colors.blue;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  String _formatStatus(String status) {
+    switch (status) {
+      case 'in_progress':
+        return 'In Progress';
+      default:
+        return status[0].toUpperCase() + status.substring(1);
+    }
+  }
+
+  Future<void> _updateStatus(SupportQuery q, String newStatus) async {
+    await SupportStore.I.updateQueryStatus(id: q.id, status: newStatus);
+  }
+
+  Future<void> _deleteQuery(SupportQuery q) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Query'),
+        content: const Text('Are you sure you want to delete this query?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await SupportStore.I.deleteQuery(q.id);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: SupportStore.I,
       builder: (context, _) {
         final items = SupportStore.I.items;
+        final isLoading = SupportStore.I.isLoading;
+
         return _InfoCard(
           icon: Icons.help_outline,
-          title: 'Help and Support',
-          child: items.isEmpty
+          title: 'Help and Support Queries',
+          child: isLoading
               ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No submissions yet.'),
+                  padding: EdgeInsets.all(32.0),
+                  child: Center(child: CircularProgressIndicator()),
                 )
-              : Column(
-                  children: [
-                    for (final q in items)
-                      ListTile(
-                        dense: true,
-                        leading: const Icon(
-                          Icons.email_outlined,
-                          color: Color(0xFFFF782B),
-                        ),
-                        title: Text(q.email),
-                        subtitle: Text(q.description),
-                        trailing: Text(
-                          '${q.createdAt.year.toString().padLeft(4, '0')}-${q.createdAt.month.toString().padLeft(2, '0')}-${q.createdAt.day.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
-                          ),
+              : items.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Center(
+                        child: Text(
+                          'No submissions yet.',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
                         ),
                       ),
-                  ],
-                ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: items.length,
+                      separatorBuilder: (ctx, i) => const Divider(height: 1),
+                      itemBuilder: (ctx, i) {
+                        final q = items[i];
+                        return ExpansionTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFFFF782B).withValues(alpha: 0.1),
+                            child: const Icon(Icons.email_outlined, color: Color(0xFFFF782B), size: 20),
+                          ),
+                          title: Text(q.email, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Row(
+                            children: [
+                              Text(
+                                '${q.createdAt.year}-${q.createdAt.month.toString().padLeft(2, '0')}-${q.createdAt.day.toString().padLeft(2, '0')}',
+                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(q.status).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: _getStatusColor(q.status).withValues(alpha: 0.3)),
+                                ),
+                                child: Text(
+                                  _formatStatus(q.status),
+                                  style: TextStyle(fontSize: 10, color: _getStatusColor(q.status), fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Text('Description:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+                                  const SizedBox(height: 4),
+                                  Text(q.description),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      if (q.status != 'pending')
+                                        TextButton(
+                                          onPressed: () => _updateStatus(q, 'pending'),
+                                          child: const Text('Mark Pending'),
+                                        ),
+                                      if (q.status != 'in_progress')
+                                        TextButton(
+                                          onPressed: () => _updateStatus(q, 'in_progress'),
+                                          child: const Text('Mark In Progress'),
+                                        ),
+                                      if (q.status != 'resolved')
+                                        TextButton(
+                                          onPressed: () => _updateStatus(q, 'resolved'),
+                                          child: const Text('Mark Resolved'),
+                                        ),
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                        onPressed: () => _deleteQuery(q),
+                                        tooltip: 'Delete Query',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
         );
       },
     );
@@ -3844,9 +5203,47 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
   final _department = TextEditingController();
   final _postingDate = TextEditingController();
   final _applicationDeadline = TextEditingController();
-  final _jobId = TextEditingController();
+  final _jobId = TextEditingController(); // Reference code like JOB-2024-001
   final ScrollController _scrollController = ScrollController();
   String _contractType = 'Full-Time';
+  JobPost? _editingJob;
+
+  void _populateForm(JobPost job) {
+    setState(() {
+      _editingJob = job;
+      _title.text = job.title;
+      _experience.text = job.experience;
+      _skills.text = job.skills.join(', ');
+      _responsibilities.text = job.responsibilities.join('\n');
+      _qualifications.text = job.qualifications.join('\n');
+      _description.text = job.description;
+      _location.text = job.location;
+      _department.text = job.department;
+      _postingDate.text = job.postingDate;
+      _applicationDeadline.text = job.applicationDeadline;
+      _jobId.text = job.referenceCode ?? '';
+      _contractType = job.contractType;
+    });
+    _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+  }
+
+  void _clearForm() {
+    setState(() {
+      _editingJob = null;
+      _title.clear();
+      _experience.clear();
+      _skills.clear();
+      _responsibilities.clear();
+      _qualifications.clear();
+      _description.clear();
+      _location.clear();
+      _department.clear();
+      _postingDate.clear();
+      _applicationDeadline.clear();
+      _jobId.clear();
+      _contractType = 'Full-Time';
+    });
+  }
 
   @override
   void dispose() {
@@ -3867,15 +5264,14 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
 
   @override
   Widget build(BuildContext context) {
-    // Initialize defaults when first built
-    if (_postingDate.text.isEmpty) {
+    // Initialize defaults
+    if (_postingDate.text.isEmpty && _editingJob == null) {
       final now = DateTime.now();
       _postingDate.text =
           '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     }
-    if (_jobId.text.isEmpty) {
-      _jobId.text =
-          'JOB-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    if (_jobId.text.isEmpty && _editingJob == null) {
+      _jobId.text = 'JOB-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     }
 
     return SizedBox(
@@ -3899,13 +5295,7 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Post New Job',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    Text(_editingJob != null ? 'Edit Job' : 'Post New Job', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 14),
                     const Text(
                       'Basic Details',
@@ -4048,73 +5438,73 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                     const SizedBox(height: 8),
                     _buildMultiline('Description', _description),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Timing & IDs',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
+                    const Text('Timing & Reference', style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     _dateRow(),
                     const SizedBox(height: 12),
-                    _buildField(
-                      'Job ID',
-                      _jobId,
-                      hint: 'Auto-filled, you can edit',
-                    ),
+                    _buildField('Job ID / Reference', _jobId, hint: 'e.g., JOB-2024-001'),
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 44,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          if (_formKey.currentState!.validate()) {
-                            final success = await SupabaseHRStore.instance
-                                .createJob(
-                                  id: _jobId.text.trim(),
-                                  title: _title.text.trim(),
-                                  location: _location.text.trim(),
-                                  contractType: _contractType,
-                                  department: _department.text.trim(),
-                                  postingDate: _postingDate.text.trim(),
-                                  applicationDeadline: _applicationDeadline.text
-                                      .trim(),
-                                  experience: _experience.text.trim(),
-                                  skills: _splitList(_skills.text),
-                                  responsibilities: _splitLines(
-                                    _responsibilities.text,
-                                  ),
-                                  qualifications: _splitLines(
-                                    _qualifications.text,
-                                  ),
-                                  description: _description.text.trim(),
-                                );
-
-                            if (success) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Job posted successfully'),
-                                ),
-                              );
-                              // Clear form
-                              _formKey.currentState!.reset();
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Failed to post job. Please try again.',
-                                  ),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF782B),
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text(
-                          'Submit Job',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                      child: Row(
+                        children: [
+                          if (_editingJob != null) ...[
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _clearForm,
+                                child: const Text('Cancel Edit'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                if (_formKey.currentState!.validate()) {
+                                  final job = JobPost(
+                                    id: _editingJob?.id ?? '', // Empty for new, existing for edit
+                                    referenceCode: _jobId.text.trim().isEmpty ? null : _jobId.text.trim(),
+                                    title: _title.text.trim(),
+                                    description: _description.text.trim(),
+                                    location: _location.text.trim(),
+                                    contractType: _contractType,
+                                    department: _department.text.trim(),
+                                    postingDate: _postingDate.text.trim(),
+                                    applicationDeadline: _applicationDeadline.text.trim(),
+                                    experience: _experience.text.trim(),
+                                    skills: _splitList(_skills.text),
+                                    responsibilities: _splitLines(_responsibilities.text),
+                                    qualifications: _splitLines(_qualifications.text),
+                                  );
+                                  
+                                  try {
+                                    if (_editingJob != null) {
+                                      await PostStore.I.updateJob(job);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Job updated successfully')),
+                                      );
+                                    } else {
+                                      await PostStore.I.addJob(job);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Job posted successfully')),
+                                      );
+                                    }
+                                    _clearForm();
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                    );
+                                  }
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF782B),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text(_editingJob != null ? 'Update Job' : 'Submit Job', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -4155,41 +5545,29 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        j['title'] ?? '',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${j['id']} • ${j['posting_date']}',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.black54,
-                                        ),
-                                      ),
+                                      Text(j.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      Text('${j.referenceCode ?? j.id} • ${j.postingDate}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
                                     ],
                                   ),
                                 ),
-                                TextButton.icon(
-                                  onPressed: () async {
-                                    final ok = await store.deleteJob(j['id']);
-                                    if (ok && context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Job deleted'),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.red,
+                                  TextButton.icon(
+                                    onPressed: () => _populateForm(j),
+                                    icon: const Icon(Icons.edit_outlined),
+                                    label: const Text('Edit'),
                                   ),
-                                  icon: const Icon(Icons.delete_outline),
-                                  label: const Text('Delete'),
-                                ),
+                                  TextButton.icon(
+                                    onPressed: () async {
+                                      final ok = await PostStore.I.deleteJob(j.id);
+                                      if (ok && mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Job deleted')),
+                                        );
+                                      }
+                                    },
+                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                    icon: const Icon(Icons.delete_outline),
+                                    label: const Text('Delete'),
+                                  ),
                               ],
                             );
                           },
@@ -4360,6 +5738,32 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
   final _postingDate = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   // Removed: Location, Contract Type, Internship ID as per requirements
+  InternshipPost? _editingInternship;
+
+  void _populateForm(InternshipPost post) {
+    setState(() {
+      _editingInternship = post;
+      _title.text = post.title;
+      _skill.text = post.skill;
+      _qualification.text = post.qualification;
+      _duration.text = post.duration;
+      _description.text = post.description;
+      _postingDate.text = post.postingDate;
+    });
+    _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+  }
+
+  void _clearForm() {
+    setState(() {
+      _editingInternship = null;
+      _title.clear();
+      _skill.clear();
+      _qualification.clear();
+      _duration.clear();
+      _description.clear();
+      _postingDate.clear();
+    });
+  }
 
   @override
   void dispose() {
@@ -4403,13 +5807,7 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Post New Internship',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    Text(_editingInternship != null ? 'Edit Internship' : 'Post New Internship', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 14),
                     const Text(
                       'Basic Details',
@@ -4499,52 +5897,61 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 44,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          if (_formKey.currentState!.validate()) {
-                            final genId =
-                                'INT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-                            final success = await SupabaseHRStore.instance
-                                .createInternship(
-                                  id: genId,
-                                  title: _title.text.trim(),
-                                  skill: _skill.text.trim(),
-                                  qualification: _qualification.text.trim(),
-                                  duration: _duration.text.trim(),
-                                  description: _description.text.trim(),
-                                  postingDate: _postingDate.text.trim(),
-                                );
-
-                            if (success) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Internship posted successfully',
-                                  ),
-                                ),
-                              );
-                              // Clear form
-                              _formKey.currentState!.reset();
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Failed to post internship. Please try again.',
-                                  ),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF782B),
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text(
-                          'Submit Internship',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                      child: Row(
+                        children: [
+                          if (_editingInternship != null) ...[
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _clearForm,
+                                child: const Text('Cancel Edit'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                if (_formKey.currentState!.validate()) {
+                                  final post = InternshipPost(
+                                    id: _editingInternship?.id ?? '', // Empty for new, existing for edit
+                                    title: _title.text.trim(),
+                                    skill: _skill.text.trim(),
+                                    qualification: _qualification.text.trim(),
+                                    duration: _duration.text.trim(),
+                                    description: _description.text.trim(),
+                                    location: _editingInternship?.location ?? '',
+                                    contractType: _editingInternship?.contractType ?? '',
+                                    postingDate: _postingDate.text.trim(),
+                                  );
+                                  
+                                  try {
+                                    if (_editingInternship != null) {
+                                      await PostStore.I.updateInternship(post);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Internship updated successfully')),
+                                      );
+                                    } else {
+                                      await PostStore.I.addInternship(post);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Internship posted successfully')),
+                                      );
+                                    }
+                                    _clearForm();
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                    );
+                                  }
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF782B),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text(_editingInternship != null ? 'Update Internship' : 'Submit Internship', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -4601,27 +6008,24 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                                     ],
                                   ),
                                 ),
-                                TextButton.icon(
-                                  onPressed: () async {
-                                    final ok = await store.deleteInternship(
-                                      i['id'],
-                                    );
-                                    if (ok && context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Internship deleted'),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.red,
+                                  TextButton.icon(
+                                    onPressed: () => _populateForm(it),
+                                    icon: const Icon(Icons.edit_outlined),
+                                    label: const Text('Edit'),
                                   ),
-                                  icon: const Icon(Icons.delete_outline),
-                                  label: const Text('Delete'),
-                                ),
+                                  TextButton.icon(
+                                    onPressed: () async {
+                                      final ok = await PostStore.I.deleteInternship(it.id);
+                                      if (ok && mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Internship deleted')),
+                                        );
+                                      }
+                                    },
+                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                    icon: const Icon(Icons.delete_outline),
+                                    label: const Text('Delete'),
+                                  ),
                               ],
                             );
                           },
