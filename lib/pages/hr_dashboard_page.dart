@@ -1184,63 +1184,6 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                   ),
                   SizedBox(
                     height: 540,
-                        final updatedRecord = await showDialog<_EmployeeRecord>(
-                          context: context,
-                          builder: (context) =>
-                              _EditEmployeeDialog(employee: record),
-                        );
-                        if (!context.mounted) return;
-                        if (updatedRecord != null) {
-                          _data.updateEmployee(record, updatedRecord);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Employee "${updatedRecord.name}" updated.',
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      onDelete: (record) async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Delete Employee'),
-                            content: Text(
-                              'Are you sure you want to delete ${record.name}?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                ),
-                                child: const Text('Delete'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (!context.mounted) return;
-                        if (confirmed == true) {
-                          _data.removeEmployee(record);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Employee "${record.name}" deleted.',
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      showTitle: false,
-                    ),
-=======
                     child: _isLoading
                         ? const Center(
                             child: Column(
@@ -1329,7 +1272,6 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                                 },
                                 showTitle: false,
                               ),
->>>>>>> 02c5e94 (Database connecting)
                   ),
                 ],
               ),
@@ -5545,19 +5487,19 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(j.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      Text('${j.referenceCode ?? j.id} • ${j.postingDate}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                      Text(j['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                      Text('${j['reference_code'] ?? j['id']} • ${j['posting_date']}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
                                     ],
                                   ),
                                 ),
                                   TextButton.icon(
-                                    onPressed: () => _populateForm(j),
+                                    onPressed: () => _populateForm(JobPost.fromJson(j)),
                                     icon: const Icon(Icons.edit_outlined),
                                     label: const Text('Edit'),
                                   ),
                                   TextButton.icon(
                                     onPressed: () async {
-                                      final ok = await PostStore.I.deleteJob(j.id);
+                                      final ok = await PostStore.I.deleteJob(j['id']);
                                       if (ok && mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           const SnackBar(content: Text('Job deleted')),
@@ -6009,13 +5951,13 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                                   ),
                                 ),
                                   TextButton.icon(
-                                    onPressed: () => _populateForm(it),
+                                    onPressed: () => _populateForm(InternshipPost.fromJson(i)),
                                     icon: const Icon(Icons.edit_outlined),
                                     label: const Text('Edit'),
                                   ),
                                   TextButton.icon(
                                     onPressed: () async {
-                                      final ok = await PostStore.I.deleteInternship(it.id);
+                                      final ok = await PostStore.I.deleteInternship(i['id']);
                                       if (ok && mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           const SnackBar(content: Text('Internship deleted')),
