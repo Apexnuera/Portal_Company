@@ -10,6 +10,7 @@ import '../widgets/timesheet_content.dart';
 import '../utils/document_picker.dart';
 import '../widgets/compensation_content.dart';
 import '../services/alert_service.dart';
+import '../services/employee_profile_service.dart'; // Added for profile loading
 import '../utils/image_picker.dart';
 import '../utils/validators.dart';
 
@@ -17,12 +18,14 @@ class ProfessionalProfileContent extends StatefulWidget {
   final EmployeeProfessionalProfile initialProfile;
   final bool forceEditMode;
   final void Function(EmployeeProfessionalProfile) onSaved;
+  final bool isHrMode;
 
   const ProfessionalProfileContent({
     super.key,
     required this.initialProfile,
     this.forceEditMode = false,
     required this.onSaved,
+    this.isHrMode = false,
   });
 
   @override
@@ -1053,11 +1056,112 @@ class _EmploymentEntryForm {
   }
 }
 
-class EmployeeDashboardPage extends StatelessWidget {
+class EmployeeDashboardPage extends StatefulWidget {
   const EmployeeDashboardPage({super.key});
 
   @override
+  State<EmployeeDashboardPage> createState() => _EmployeeDashboardPageState();
+}
+
+class _EmployeeDashboardPageState extends State<EmployeeDashboardPage> {
+  bool _isLoadingProfile = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmployeeProfileFromSupabase();
+  }
+
+  /// Load employee profile from Supabase on initialization
+  Future<void> _loadEmployeeProfileFromSupabase() async {
+    try {
+      setState(() {
+        _isLoadingProfile = true;
+        _loadError = null;
+      });
+
+      debugPrint('Loading employee profile from Supabase...');
+      
+      // Initialize EmployeeProfileService and load current user's profile
+      await EmployeeProfileService.instance.initialize();
+      
+      // Get the loaded profile
+      final profile = EmployeeProfileService.instance.currentProfile;
+      
+      if (profile != null && mounted) {
+        debugPrint('Profile loaded successfully: ${profile.id}');
+        
+        // Add to EmployeeDirectory so the UI can access it
+        final directory = context.read<EmployeeDirectory>();
+        directory.addEmployee(profile);
+        directory.setPrimaryEmployee(profile.id);
+        
+        debugPrint('Employee profile added to directory');
+      } else {
+        debugPrint('No profile found for current user');
+        _loadError = 'No employee profile found. Please contact HR.';
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading employee profile: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+          _loadError = 'Failed to load profile: $e';
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Show loading state while profile is being loaded
+    if (_isLoadingProfile) {
+      return Scaffold(
+        backgroundColor: Colors.grey.shade100,
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Color(0xFFFF782B)),
+              SizedBox(height: 16),
+              Text('Loading your profile...', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show error state if profile loading failed
+    if (_loadError != null) {
+      return Scaffold(
+        backgroundColor: Colors.grey.shade100,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(_loadError!, style: const TextStyle(fontSize: 16), textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadEmployeeProfileFromSupabase,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF782B)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final directory = context.watch<EmployeeDirectory>();
     final employeeId = directory.primaryEmployeeId;
     final record = directory.tryGetById(employeeId);
@@ -1626,6 +1730,21 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
+  /// Determines if a field can be edited based on user role and field name
+  bool _canEditField(String label) {
+    // HR can edit all fields
+    if (widget.isHrMode) return true;
+    
+    // Employee restrictions - certain fields are read-only
+    const employeeReadOnlyFields = [
+      'Full name',
+      'Employee email id',
+      'Asset details',
+    ];
+    
+    return !employeeReadOnlyFields.contains(label);
+  }
+
   Widget _buildField(String label, TextEditingController controller, {
     double width = 300,
     bool enabled = true,
@@ -1659,7 +1778,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
       width: width,
       child: TextFormField(
         controller: controller,
-        enabled: enabled,
+        enabled: enabled && _isEditMode && _canEditField(label), // Apply permission check
         focusNode: focusNode,
         keyboardType: keyboardType,
         validator: validator,
@@ -1669,7 +1788,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
           labelText: label,
           border: const OutlineInputBorder(),
           filled: true,
-          fillColor: enabled ? Colors.white : Colors.grey.shade100,
+          fillColor: (enabled && _canEditField(label)) ? Colors.white : Colors.grey.shade100,
           counterText: maxLength != null ? '' : null,
         ),
       ),
@@ -1846,13 +1965,74 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     try {
+                      // Show loading dialog
+                      if (context.mounted) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const Center(
+                            child: Card(
+                              child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    CircularProgressIndicator(color: Color(0xFFFF782B)),
+                                    SizedBox(height: 16),
+                                    Text('Uploading profile picture...'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
                       final bytes = await ImagePickerWeb.pickImage();
+                      
                       if (bytes != null && context.mounted) {
-                        setState(() {
-                          _workingCopy.profileImageBytes = bytes;
-                        });
+                        // Upload to Supabase Storage
+                        final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.png';
+                        final error = await EmployeeProfileService.instance.uploadProfileImage(bytes, fileName);
+                        
+                        // Close loading dialog
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                        }
+                        
+                        if (error != null) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to upload: $error')),
+                            );
+                          }
+                        } else {
+                          // Update local state
+                          setState(() {
+                            _workingCopy.profileImageBytes = bytes;
+                          });
+                          
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Profile picture uploaded successfully!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        }
+                      } else {
+                        // No image selected - close loading dialog
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                        }
                       }
                     } catch (e) {
+                      // Close loading dialog if open
+                      if (context.mounted) {
+                        Navigator.of(context, rootNavigator: true).pop();
+                      }
+                      
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Failed to pick image: $e')),
@@ -1940,7 +2120,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                         const SizedBox(height: 12),
                         TextButton.icon(
                           onPressed: () {
-                            context.read<AlertService>().add('Bank details change requested by ${_workingCopy.fullName} (${widget.employeeId})');
+                            context.read<AlertService>().add('Bank Details Update', 'Bank details change requested by ${_workingCopy.fullName} (${widget.employeeId})');
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Request sent to HR.')));
                           },
                           icon: const Icon(Icons.request_page_outlined),
@@ -1982,7 +2162,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                           children: [
                             const Text('Project Allocation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                             const SizedBox(width: 8),
-                            if (!widget.forceReadOnly) changeButton,
+                            if (!widget.forceReadOnly && widget.isHrMode) changeButton,  // Only HR can change
                           ],
                         );
                       }
@@ -1991,7 +2171,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                         children: [
                           const Text('Project Allocation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                           const Spacer(),
-                          if (!widget.forceReadOnly) changeButton,
+                          if (!widget.forceReadOnly && widget.isHrMode) changeButton,  // Only HR can change
                         ],
                       );
                     },
@@ -2088,7 +2268,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                 children: [
                   const Text('Asset Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
-                  if (!_isEditMode) ...[
+                  if (!_isEditMode || !widget.isHrMode) ...[ // Employees always see read-only
                     if (_selectedAssets.isEmpty && _otherAssetsController.text.isEmpty)
                       const Text('No assets assigned')
                     else
@@ -2108,7 +2288,7 @@ class _PersonalDetailsContentState extends State<PersonalDetailsContent> {
                         ],
                       ),
                   ],
-                  if (_isEditMode) ...[
+                  if (_isEditMode && widget.isHrMode) ...[ // Only HR can edit
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,

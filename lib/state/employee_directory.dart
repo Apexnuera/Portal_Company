@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import '../utils/document_picker.dart';
+import '../services/employee_profile_service.dart';
 
 class EmployeePersonalDetails {
   EmployeePersonalDetails({
@@ -314,6 +315,11 @@ class EmployeeDirectory extends ChangeNotifier {
     record.name = record.personal.fullName;
     record.primaryEmail = record.personal.corporateEmail;
     notifyListeners();
+    
+    // Sync to Supabase
+    EmployeeProfileService.instance.updatePersonalDetails(details).catchError((e) {
+      debugPrint('Failed to sync personal details to Supabase: $e');
+    });
   }
 
   void updateProfessionalProfile(String id, EmployeeProfessionalProfile profile) {
@@ -321,6 +327,11 @@ class EmployeeDirectory extends ChangeNotifier {
     if (record == null) return;
     record.professional = profile.copy();
     notifyListeners();
+    
+    // Sync to Supabase
+    EmployeeProfileService.instance.updateProfessionalProfile(profile).catchError((e) {
+      debugPrint('Failed to sync professional profile to Supabase: $e');
+    });
   }
 
   void updateCompensation(String id, CompensationInfo data) {
@@ -328,6 +339,11 @@ class EmployeeDirectory extends ChangeNotifier {
     if (record == null) return;
     record.compensation = data.copy();
     notifyListeners();
+    
+    // Sync to Supabase
+    EmployeeProfileService.instance.updateCompensation(data).catchError((e) {
+      debugPrint('Failed to sync compensation to Supabase: $e');
+    });
   }
 
   void updateTax(String id, TaxInfo data) {
@@ -335,6 +351,11 @@ class EmployeeDirectory extends ChangeNotifier {
     if (record == null) return;
     record.tax = data.copy();
     notifyListeners();
+    
+    // Sync to Supabase
+    EmployeeProfileService.instance.updateTaxInfo(data).catchError((e) {
+      debugPrint('Failed to sync tax info to Supabase: $e');
+    });
   }
 
   void updateCompensationValue(String id, {double? basic, double? gross, double? net, double? travelAllowance}) {

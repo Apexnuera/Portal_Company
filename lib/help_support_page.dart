@@ -33,32 +33,50 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     super.dispose();
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
-      // Store in shared SupportStore so HR dashboard reflects immediately
-      SupportStore.I.addQuery(
-        SupportQuery(
-          email: _emailController.text.trim(),
-          description: _descriptionController.text.trim(),
-          createdAt: DateTime.now(),
-        ),
+      setState(() => _submitted = true); // Re-using _submitted as loading state temporarily or add a new one? 
+      // Actually, let's keep _submitted for success view, and show a loading indicator if needed.
+      // But for now, let's just await.
+      
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(child: CircularProgressIndicator()),
       );
 
-      // Feedback to user
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Support request submitted successfully!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
+      final success = await SupportStore.I.addQuery(
+        email: _emailController.text.trim(),
+        description: _descriptionController.text.trim(),
       );
 
-      // Clear form
-      _emailController.clear();
-      _descriptionController.clear();
-      setState(() {
-        _submitted = true;
-      });
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Dismiss loading dialog
+
+      if (success) {
+        // Feedback to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Support request submitted successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Clear form
+        _emailController.clear();
+        _descriptionController.clear();
+        setState(() {
+          _submitted = true;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit query: ${SupportStore.I.error ?? "Unknown error"}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -268,51 +286,21 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
               const AppHeader(),
               Expanded(
                 child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: containerMaxWidth),
-                    child: Padding(
-                      padding: EdgeInsets.all(isSmallScreen ? 12.0 : 20.0),
-                      child: isSmallScreen
-                          // Stack vertically on small screens: centered form then right-aligned info
-                          ? Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Center(
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(maxWidth: 640),
-                                    child: formCard,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(maxWidth: 320),
-                                    child: infoSection,
-                                  ),
-                                ),
-                              ],
-                            )
-                          // Place form centered-left and info on the right on wider screens
-                          : Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Expanded(
-                                  child: Center(
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(maxWidth: 640),
-                                      child: formCard,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                ConstrainedBox(
-                                  constraints: const BoxConstraints(maxWidth: 300),
-                                  child: infoSection,
-                                ),
-                              ],
-                            ),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(isSmallScreen ? 12.0 : 24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 640),
+                          child: formCard,
+                        ),
+                        const SizedBox(height: 24),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 640),
+                          child: infoSection,
+                        ),
+                      ],
                     ),
                   ),
                 ),

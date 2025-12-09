@@ -27,56 +27,26 @@ DROP POLICY IF EXISTS "Employees can read own data" ON employees;
 CREATE POLICY "HR can select employees"
   ON employees
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.id = auth.uid()
-      AND user_roles.role = 'hr'
-    )
-  );
+  USING (is_hr_user(auth.uid()));
 
 -- Policy: HR can INSERT employees
 CREATE POLICY "HR can insert employees"
   ON employees
   FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.id = auth.uid()
-      AND user_roles.role = 'hr'
-    )
-  );
+  WITH CHECK (is_hr_user(auth.uid()));
 
 -- Policy: HR can UPDATE employees
 CREATE POLICY "HR can update employees"
   ON employees
   FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.id = auth.uid()
-      AND user_roles.role = 'hr'
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.id = auth.uid()
-      AND user_roles.role = 'hr'
-    )
-  );
+  USING (is_hr_user(auth.uid()))
+  WITH CHECK (is_hr_user(auth.uid()));
 
 -- Policy: HR can DELETE employees
 CREATE POLICY "HR can delete employees"
   ON employees
   FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.id = auth.uid()
-      AND user_roles.role = 'hr'
-    )
-  );
+  USING (is_hr_user(auth.uid()));
 
 -- Policy: Employees can read their own data
 CREATE POLICY "Employees can read own data"

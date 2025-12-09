@@ -15,6 +15,13 @@ class _JobsListingPageState extends State<JobsListingPage> {
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    PostStore.I.fetchPosts();
+  }
+
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -119,7 +126,7 @@ class _JobsListingPageState extends State<JobsListingPage> {
                             date: j.postingDate,
                             description: j.description,
                             location: j.location,
-                            jobId: j.id,
+                            jobId: j.referenceCode ?? j.id,
                           );
                         },
                       ),
