@@ -8,3 +8,8 @@ Future<bool> openDocumentBytes({
   // Not supported on non-web platforms in this demo.
   return false;
 }
+
+Future<bool> openDocumentUrl(String url) async {
+  // Not supported on non-web platforms in this demo.
+  return false;
+}

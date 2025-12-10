@@ -2196,14 +2196,14 @@ class _JobPostsModule extends StatefulWidget {
 }
 
 class _JobPostsModuleState extends State<_JobPostsModule> {
-  Future<void> _openPostJobDialog() async {
+  Future<void> _openPostJobDialog(JobPost job) async {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 860),
-          child: const _PostJobFormInline(),
+          child: _PostJobFormInline(jobToEdit: job),
         ),
       ),
     );
@@ -2246,17 +2246,7 @@ class _JobPostsModuleState extends State<_JobPostsModule> {
                   'All Job Posts',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: _openPostJobDialog,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Post Job'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFF782B),
-                    side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  ),
-                ),
+                // "Post Job" button removed as per requirements (separate tab)
               ],
             ),
           ),
@@ -2264,7 +2254,7 @@ class _JobPostsModuleState extends State<_JobPostsModule> {
             height: listHeight,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: _JobPostsList(onEdit: (job) => _openPostJobDialog()),
+              child: _JobPostsList(onEdit: (job) => _openPostJobDialog(job)),
             ),
           ),
         ],
@@ -2658,14 +2648,14 @@ class _InternshipPostsModule extends StatefulWidget {
 }
 
 class _InternshipPostsModuleState extends State<_InternshipPostsModule> {
-  Future<void> _openPostInternshipDialog() async {
+  Future<void> _openPostInternshipDialog(InternshipPost post) async {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 860),
-          child: const _PostInternshipFormInline(),
+          child: _PostInternshipFormInline(internshipToEdit: post),
         ),
       ),
     );
@@ -2708,17 +2698,7 @@ class _InternshipPostsModuleState extends State<_InternshipPostsModule> {
                   'All Internship Posts',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: _openPostInternshipDialog,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Post Internship'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFF782B),
-                    side: BorderSide(color: const Color(0xFFFF782B).withValues(alpha: 0.6)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  ),
-                ),
+                // "Post Internship" button removed as per requirements (separate tab)
               ],
             ),
           ),
@@ -2726,7 +2706,7 @@ class _InternshipPostsModuleState extends State<_InternshipPostsModule> {
             height: listHeight,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: _InternshipPostsList(onEdit: (internship) => _openPostInternshipDialog()),
+              child: _InternshipPostsList(onEdit: (internship) => _openPostInternshipDialog(internship)),
             ),
           ),
         ],
@@ -5117,7 +5097,8 @@ class _QueriesListState extends State<_QueriesList> {
 }
 
 class _PostJobFormInline extends StatefulWidget {
-  const _PostJobFormInline();
+  final JobPost? jobToEdit; // Added parameter
+  const _PostJobFormInline({this.jobToEdit});
   @override
   State<_PostJobFormInline> createState() => _PostJobFormInlineState();
 }
@@ -5194,8 +5175,16 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.jobToEdit != null) {
+      _populateForm(widget.jobToEdit!);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Initialize defaults
+    // Initialize defaults only if not editing
     if (_postingDate.text.isEmpty && _editingJob == null) {
       final now = DateTime.now();
       _postingDate.text =
@@ -5439,72 +5428,16 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      'Manage Jobs',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Consumer<SupabaseHRStore>(
-                      builder: (context, store, _) {
-                        final items = store.jobs;
-                        if (store.isLoading) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-                        }
-                        if (items.isEmpty) {
-                          return const Text('No active job posts yet.');
-                        }
-                        return ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 12),
-                          itemBuilder: (context, index) {
-                            final j = items[index];
-                            return Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(j['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      Text('${j['reference_code'] ?? j['id']} • ${j['posting_date']}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                                    ],
-                                  ),
-                                ),
-                                  TextButton.icon(
-                                    onPressed: () => _populateForm(JobPost.fromJson(j)),
-                                    icon: const Icon(Icons.edit_outlined),
-                                    label: const Text('Edit'),
-                                  ),
-                                  TextButton.icon(
-                                    onPressed: () async {
-                                      final ok = await PostStore.I.deleteJob(j['id']);
-                                      if (ok && mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Job deleted')),
-                                        );
-                                      }
-                                    },
-                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                    icon: const Icon(Icons.delete_outline),
-                                    label: const Text('Delete'),
-                                  ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    ),
+                    // Removed "Manage Jobs" list from here
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
                   ],
                 ),
               ),
@@ -5653,7 +5586,8 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
 }
 
 class _PostInternshipFormInline extends StatefulWidget {
-  const _PostInternshipFormInline();
+  final InternshipPost? internshipToEdit;
+  const _PostInternshipFormInline({this.internshipToEdit});
   @override
   State<_PostInternshipFormInline> createState() =>
       _PostInternshipFormInlineState();
@@ -5671,6 +5605,14 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
   // Removed: Location, Contract Type, Internship ID as per requirements
   InternshipPost? _editingInternship;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.internshipToEdit != null) {
+      _populateForm(widget.internshipToEdit!);
+    }
+  }
+
   void _populateForm(InternshipPost post) {
     setState(() {
       _editingInternship = post;
@@ -5681,7 +5623,8 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
       _description.text = post.description;
       _postingDate.text = post.postingDate;
     });
-    _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    // _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    // Don't animate in initState
   }
 
   void _clearForm() {
@@ -5710,8 +5653,8 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
 
   @override
   Widget build(BuildContext context) {
-    // Initialize defaults
-    if (_postingDate.text.isEmpty) {
+    // Initialize defaults only if not editing
+    if (_postingDate.text.isEmpty && _editingInternship == null) {
       final now = DateTime.now();
       _postingDate.text =
           '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
@@ -5886,83 +5829,16 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      'Manage Internships',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Consumer<SupabaseHRStore>(
-                      builder: (context, store, _) {
-                        final items = store.internships;
-                        if (store.isLoading) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-                        }
-                        if (items.isEmpty) {
-                          return const Text('No active internship posts yet.');
-                        }
-                        return ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 12),
-                          itemBuilder: (context, index) {
-                            final i = items[index];
-                            return Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        i['title'] ?? '',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${i['id']} • ${i['posting_date']}',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                  TextButton.icon(
-                                    onPressed: () => _populateForm(InternshipPost.fromJson(i)),
-                                    icon: const Icon(Icons.edit_outlined),
-                                    label: const Text('Edit'),
-                                  ),
-                                  TextButton.icon(
-                                    onPressed: () async {
-                                      final ok = await PostStore.I.deleteInternship(i['id']);
-                                      if (ok && mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Internship deleted')),
-                                        );
-                                      }
-                                    },
-                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                    icon: const Icon(Icons.delete_outline),
-                                    label: const Text('Delete'),
-                                  ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    ),
+                    // Removed "Manage Internships" list from here
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
                   ],
                 ),
               ),

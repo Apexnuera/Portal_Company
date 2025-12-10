@@ -33,6 +33,11 @@ Future<bool> openDocumentBytes({
   return true;
 }
 
+Future<bool> openDocumentUrl(String url) async {
+  html.window.open(url, '_blank');
+  return true;
+}
+
 String _getMimeTypeFromExtension(String ext) {
   switch (ext) {
     // Documents

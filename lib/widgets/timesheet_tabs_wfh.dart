@@ -12,7 +12,8 @@ class WFHRequestTab extends StatefulWidget {
 }
 
 class _WFHRequestTabState extends State<WFHRequestTab> {
-  DateTime? _wfhDate;
+  DateTime? _startDate;
+  DateTime? _endDate;
   final _wfhReasonController = TextEditingController();
   int? _filterMonth, _filterYear;
 
@@ -22,23 +23,60 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
     super.dispose();
   }
 
-  Future<void> _pickWFHDate() async {
+  Future<void> _pickDate({required bool isStart}) async {
+    final initialDate = isStart ? (_startDate ?? DateTime.now()) : (_endDate ?? _startDate ?? DateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: _wfhDate ?? DateTime.now(),
+      initialDate: initialDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
     );
-    if (picked != null) setState(() => _wfhDate = picked);
+    
+    if (picked != null) {
+        setState(() {
+            if (isStart) {
+                _startDate = picked;
+                // Auto-set end date to start date if it's not set, or if it's invalid
+                if (_endDate == null || _endDate!.isBefore(_startDate!)) {
+                    _endDate = _startDate;
+                }
+            } else {
+                _endDate = picked;
+                // If start date is not set, set it to end date
+                if (_startDate == null) {
+                    _startDate = picked;
+                } 
+                // If start date is after new end date, move start date to end date
+                else if (_startDate!.isAfter(_endDate!)) {
+                    _startDate = _endDate;
+                }
+            }
+        });
+    }
   }
 
   Future<void> _submitWFHRequest() async {
     final ts = Provider.of<TimeSheetService>(context, listen: false);
-    final ok = await ts.submitWFHRequest(startDate: _wfhDate!, endDate: _wfhDate!, reason: _wfhReasonController.text.trim());
+    
+    if (_startDate == null) return;
+    
+    // Default end date to start date if null (single day)
+    final effectiveEndDate = _endDate ?? _startDate!;
+    
+    // Ensure effective end date is valid (at least start date)
+    final finalEndDate = effectiveEndDate.isBefore(_startDate!) ? _startDate! : effectiveEndDate;
+    
+    final ok = await ts.submitWFHRequest(
+        startDate: _startDate!, 
+        endDate: finalEndDate, 
+        reason: _wfhReasonController.text.trim()
+    );
+    
     if (ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WFH request submitted successfully')));
       setState(() {
-        _wfhDate = null;
+        _startDate = null;
+        _endDate = null;
         _wfhReasonController.clear();
       });
     }
@@ -74,10 +112,24 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
           children: [
             const Text('Submit New WFH Request', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _pickWFHDate,
-              icon: const Icon(Icons.date_range),
-              label: Text(_wfhDate == null ? 'Select Date' : ts.formatDate(_wfhDate!)),
+            Row(
+                children: [
+                    Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _pickDate(isStart: true),
+                          icon: const Icon(Icons.date_range),
+                          label: Text(_startDate == null ? 'Start Date' : ts.formatDate(_startDate!)),
+                        ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _pickDate(isStart: false),
+                          icon: const Icon(Icons.date_range),
+                          label: Text(_endDate == null ? 'End Date' : ts.formatDate(_endDate!)),
+                        ),
+                    ),
+                ],
             ),
             const SizedBox(height: 16),
             TextField(
@@ -86,13 +138,20 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
               decoration: const InputDecoration(labelText: 'Reason for WFH', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _wfhDate != null && _wfhReasonController.text.trim().isNotEmpty ? _submitWFHRequest : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF782B),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Submit WFH Request'),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _wfhReasonController,
+              builder: (context, value, child) {
+                return ElevatedButton(
+                  onPressed: _startDate != null && value.text.trim().isNotEmpty
+                      ? _submitWFHRequest
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF782B),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Submit WFH Request'),
+                );
+              },
             ),
           ],
         ),

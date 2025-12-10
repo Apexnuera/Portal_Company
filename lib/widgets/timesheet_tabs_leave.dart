@@ -146,34 +146,85 @@ class _LeaveRequestTabState extends State<LeaveRequestTab> {
               decoration: const InputDecoration(labelText: 'Reason for Leave', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _uploadDocument,
-                  icon: const Icon(Icons.upload_file),
-                  label: Text(_supportingDocument == null ? 'Upload Document' : 'Document Uploaded'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _supportingDocument == null ? Colors.grey.shade600 : Colors.green,
-                    foregroundColor: Colors.white,
+            // Document Upload (only for Sick Leave)
+            if (_leaveType == 'Sick Leave') ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: _supportingDocument == null ? Colors.orange : Colors.green, 
+                    width: 1
                   ),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                if (_supportingDocument != null) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _supportingDocument!.name,
-                      style: const TextStyle(fontStyle: FontStyle.italic),
-                      overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          _supportingDocument == null ? Icons.warning_amber_rounded : Icons.check_circle, 
+                          color: _supportingDocument == null ? Colors.orange : Colors.green
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _supportingDocument == null 
+                              ? 'Medical Certificate Required' 
+                              : 'Document Attached: ${_supportingDocument!.name}',
+                            style: TextStyle(
+                              color: _supportingDocument == null ? Colors.orange.shade800 : Colors.green.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (_supportingDocument != null)
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.grey),
+                            onPressed: () => setState(() => _supportingDocument = null),
+                            tooltip: 'Remove document',
+                          ),
+                      ],
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _uploadDocument,
+                        icon: const Icon(Icons.upload_file),
+                        label: Text(_supportingDocument == null ? 'Upload Medical Certificate' : 'Change Document'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFFF782B),
+                          side: const BorderSide(color: Color(0xFFFF782B)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _leaveType != null && _startDate != null && _endDate != null && _reasonController.text.trim().isNotEmpty
-                  ? _submitLeaveRequest
-                  : null,
+              onPressed: () {
+                // Validation logic
+                if (_leaveType == null || _startDate == null || _endDate == null || _reasonController.text.trim().isEmpty) {
+                  return; // Should be handled by button disable state or form validation
+                }
+                // Sick Leave validation
+                if (_leaveType == 'Sick Leave' && _supportingDocument == null) {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please upload a medical certificate for Sick Leave.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                _submitLeaveRequest();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF782B),
                 foregroundColor: Colors.white,
@@ -284,7 +335,7 @@ class _LeaveRequestTabState extends State<LeaveRequestTab> {
                 ),
                 const Divider(height: 24),
                 Text('Reason: ${request.reason}'),
-                if (request.documentName != null && request.documentBytes != null) ...[
+                if (request.documentName != null && request.documentUrl != null) ...[
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -299,15 +350,9 @@ class _LeaveRequestTabState extends State<LeaveRequestTab> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        onPressed: () async {
-                          final opened = await openDocumentBytes(
-                            bytes: Uint8List.fromList(request.documentBytes!),
-                            fileName: request.documentName!,
-                          );
-                          if (!opened && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Document preview not supported on this platform.')),
-                            );
+                        onPressed: () {
+                          if (request.documentUrl != null) {
+                            openDocumentUrl(request.documentUrl!);
                           }
                         },
                         icon: const Icon(Icons.visibility_outlined),
