@@ -8,6 +8,7 @@ import '../state/employee_directory.dart';
 import '../services/faq_service.dart';
 import '../widgets/timesheet_content.dart';
 import '../utils/document_picker.dart';
+import '../utils/document_viewer.dart';
 import '../widgets/compensation_content.dart';
 import '../services/alert_service.dart';
 import '../services/employee_profile_service.dart'; // Added for profile loading
@@ -212,10 +213,14 @@ class _ProfessionalProfileContentState extends State<ProfessionalProfileContent>
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 
-  void _openDocument(String name, Uint8List? bytes) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Document viewing not implemented')),
-    );
+  Future<void> _openDocument(String name, Uint8List? bytes) async {
+    if (bytes == null) return;
+    final opened = await openDocumentBytes(bytes: bytes, fileName: name);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Document preview not supported on this platform.')),
+      );
+    }
   }
 
   void _addSkill() {

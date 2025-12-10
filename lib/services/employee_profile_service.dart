@@ -242,6 +242,59 @@ class EmployeeProfileService extends ChangeNotifier {
     }
   }
 
+  /// Update professional profile for a specific employee (for HR use)
+  /// This allows HR to update any employee's profile by specifying their employee_id
+  Future<String?> updateProfessionalProfileForEmployee(
+    String employeeId,
+    EmployeeProfessionalProfile profile,
+  ) async {
+    try {
+      // Look up the profile ID for this employee
+      final response = await SupabaseConfig.client
+          .from('employee_profiles')
+          .select('id')
+          .eq('employee_id', employeeId)
+          .maybeSingle();
+
+      if (response == null) {
+        return 'Employee profile not found: $employeeId';
+      }
+
+      final profileId = response['id'] as String;
+      debugPrint('Updating professional profile for employee $employeeId (profileId: $profileId)');
+
+      final updates = {
+        'position': profile.position,
+        'department': profile.department,
+        'manager_name': profile.managerName,
+        'employment_type': profile.employmentType,
+        'location': profile.location,
+        'work_space': profile.workSpace,
+        'job_level': profile.jobLevel,
+        'start_date': profile.startDate?.toIso8601String(),
+        'confirmation_date': profile.confirmationDate?.toIso8601String(),
+        'skills': profile.skills,
+      };
+
+      await SupabaseConfig.client
+          .from('employee_profiles')
+          .update(updates)
+          .eq('id', profileId);
+
+      // Update education entries with correct profile ID
+      await _updateEducationEntriesForProfile(profileId, profile.education);
+
+      // Update employment history with correct profile ID
+      await _updateEmploymentHistoryForProfile(profileId, profile.employmentHistory);
+
+      debugPrint('Professional profile updated for employee $employeeId');
+      return null; // Success
+    } catch (e) {
+      debugPrint('Error updating professional profile for employee: $e');
+      return 'Failed to update: $e';
+    }
+  }
+
   /// Update compensation info
   Future<String?> updateCompensation(CompensationInfo compensation) async {
     if (_currentEmployeeProfileId == null) {
@@ -711,17 +764,48 @@ class EmployeeProfileService extends ChangeNotifier {
           .eq('employee_profile_id', profileId)
           .order('created_at', ascending: false);
 
-      return (response as List).map((item) {
-        return EmployeeEducationEntry(
+      final List<EmployeeEducationEntry> entries = [];
+      
+      for (final item in (response as List)) {
+        final documentUrl = item['document_url'] as String?;
+        final documentName = item['document_name'] as String?;
+        Uint8List? documentBytes;
+
+        // Download document bytes if URL exists
+        if (documentUrl != null && documentUrl.isNotEmpty) {
+          try {
+            final uri = Uri.parse(documentUrl);
+            final pathSegments = uri.pathSegments;
+            final bucketIndex = pathSegments.indexOf('employee-documents');
+            
+            if (bucketIndex != -1 && bucketIndex < pathSegments.length - 1) {
+              final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
+              debugPrint('Downloading education document: $filePath');
+              
+              documentBytes = await SupabaseConfig.client.storage
+                  .from('employee-documents')
+                  .download(filePath);
+              
+              debugPrint('Education document downloaded: ${documentBytes.length} bytes');
+            }
+          } catch (e) {
+            debugPrint('Error downloading education document: $e');
+            documentBytes = null;
+          }
+        }
+
+        entries.add(EmployeeEducationEntry(
           level: item['level_of_education'] ?? '',
           institution: item['institution'] ?? '',
           degree: item['degree'] ?? '',
           year: item['year'] ?? '',
           grade: item['grade'] ?? '',
-          documentName: item['document_name'],
-          // Note: documentBytes will be null, download separately if needed
-        );
-      }).toList();
+          documentName: documentName,
+          documentBytes: documentBytes,
+        ));
+      }
+
+      return entries;
     } catch (e) {
       debugPrint('Error fetching education entries: $e');
       return [];
@@ -736,15 +820,47 @@ class EmployeeProfileService extends ChangeNotifier {
           .eq('employee_profile_id', profileId)
           .order('created_at', ascending: false);
 
-      return (response as List).map((item) {
-        return EmployeeEmploymentEntry(
+      final List<EmployeeEmploymentEntry> entries = [];
+      
+      for (final item in (response as List)) {
+        final documentUrl = item['document_url'] as String?;
+        final documentName = item['document_name'] as String?;
+        Uint8List? documentBytes;
+
+        // Download document bytes if URL exists
+        if (documentUrl != null && documentUrl.isNotEmpty) {
+          try {
+            final uri = Uri.parse(documentUrl);
+            final pathSegments = uri.pathSegments;
+            final bucketIndex = pathSegments.indexOf('employee-documents');
+            
+            if (bucketIndex != -1 && bucketIndex < pathSegments.length - 1) {
+              final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
+              debugPrint('Downloading employment document: $filePath');
+              
+              documentBytes = await SupabaseConfig.client.storage
+                  .from('employee-documents')
+                  .download(filePath);
+              
+              debugPrint('Employment document downloaded: ${documentBytes.length} bytes');
+            }
+          } catch (e) {
+            debugPrint('Error downloading employment document: $e');
+            documentBytes = null;
+          }
+        }
+
+        entries.add(EmployeeEmploymentEntry(
           companyName: item['company_name'] ?? '',
           designation: item['designation'] ?? '',
           fromDate: item['from_date'] != null ? DateTime.parse(item['from_date']) : null,
           toDate: item['to_date'] != null ? DateTime.parse(item['to_date']) : null,
-          documentName: item['document_name'],
-        );
-      }).toList();
+          documentName: documentName,
+          documentBytes: documentBytes,
+        ));
+      }
+
+      return entries;
     } catch (e) {
       debugPrint('Error fetching employment history: $e');
       return [];
@@ -887,21 +1003,43 @@ class EmployeeProfileService extends ChangeNotifier {
           .delete()
           .eq('employee_profile_id', _currentEmployeeProfileId!);
 
-      // Insert new entries
-      if (entries.isNotEmpty) {
-        final educationData = entries.map((e) => {
-          'employee_profile_id': _currentEmployeeProfileId,
-          'level_of_education': e.level,
-          'institution': e.institution,
-          'degree': e.degree,
-          'year': e.year,
-          'grade': e.grade,
-          'document_name': e.documentName,
-        }).toList();
+      // Insert new entries with document upload
+      for (final e in entries) {
+        String? documentUrl;
 
+        // Upload document to storage if bytes exist
+        if (e.documentBytes != null && e.documentName != null) {
+          try {
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final storagePath = '$_currentEmployeeProfileId/education/${timestamp}_${e.documentName}';
+            
+            await SupabaseConfig.client.storage
+                .from('employee-documents')
+                .uploadBinary(storagePath, e.documentBytes!, fileOptions: FileOptions(upsert: true));
+            
+            documentUrl = SupabaseConfig.client.storage
+                .from('employee-documents')
+                .getPublicUrl(storagePath);
+            
+            debugPrint('Education document uploaded: $storagePath');
+          } catch (uploadError) {
+            debugPrint('Error uploading education document: $uploadError');
+          }
+        }
+
+        // Insert education entry with document URL
         await SupabaseConfig.client
             .from('education_entries')
-            .insert(educationData);
+            .insert({
+              'employee_profile_id': _currentEmployeeProfileId,
+              'level_of_education': e.level,
+              'institution': e.institution,
+              'degree': e.degree,
+              'year': e.year,
+              'grade': e.grade,
+              'document_name': e.documentName,
+              'document_url': documentUrl,
+            });
       }
     } catch (e) {
       debugPrint('Error updating education entries: $e');
@@ -918,23 +1056,154 @@ class EmployeeProfileService extends ChangeNotifier {
           .delete()
           .eq('employee_profile_id', _currentEmployeeProfileId!);
 
-      // Insert new entries
-      if (entries.isNotEmpty) {
-        final employmentData = entries.map((e) => {
-          'employee_profile_id': _currentEmployeeProfileId,
-          'company_name': e.companyName,
-          'designation': e.designation,
-          'from_date': e.fromDate?.toIso8601String(),
-          'to_date': e.toDate?.toIso8601String(),
-          'document_name': e.documentName,
-        }).toList();
+      // Insert new entries with document upload
+      for (final e in entries) {
+        String? documentUrl;
 
+        // Upload document to storage if bytes exist
+        if (e.documentBytes != null && e.documentName != null) {
+          try {
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final storagePath = '$_currentEmployeeProfileId/employment/${timestamp}_${e.documentName}';
+            
+            await SupabaseConfig.client.storage
+                .from('employee-documents')
+                .uploadBinary(storagePath, e.documentBytes!, fileOptions: FileOptions(upsert: true));
+            
+            documentUrl = SupabaseConfig.client.storage
+                .from('employee-documents')
+                .getPublicUrl(storagePath);
+            
+            debugPrint('Employment document uploaded: $storagePath');
+          } catch (uploadError) {
+            debugPrint('Error uploading employment document: $uploadError');
+          }
+        }
+
+        // Insert employment entry with document URL
         await SupabaseConfig.client
             .from('employment_entries')
-            .insert(employmentData);
+            .insert({
+              'employee_profile_id': _currentEmployeeProfileId,
+              'company_name': e.companyName,
+              'designation': e.designation,
+              'from_date': e.fromDate?.toIso8601String(),
+              'to_date': e.toDate?.toIso8601String(),
+              'document_name': e.documentName,
+              'document_url': documentUrl,
+            });
       }
     } catch (e) {
       debugPrint('Error updating employment history: $e');
+    }
+  }
+
+  /// Update education entries for a specific profile ID (for HR use)
+  Future<void> _updateEducationEntriesForProfile(
+    String profileId,
+    List<EmployeeEducationEntry> entries,
+  ) async {
+    try {
+      // Delete existing entries
+      await SupabaseConfig.client
+          .from('education_entries')
+          .delete()
+          .eq('employee_profile_id', profileId);
+
+      // Insert new entries with document upload
+      for (final e in entries) {
+        String? documentUrl;
+
+        // Upload document to storage if bytes exist
+        if (e.documentBytes != null && e.documentName != null) {
+          try {
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final storagePath = '$profileId/education/${timestamp}_${e.documentName}';
+            
+            await SupabaseConfig.client.storage
+                .from('employee-documents')
+                .uploadBinary(storagePath, e.documentBytes!, fileOptions: FileOptions(upsert: true));
+            
+            documentUrl = SupabaseConfig.client.storage
+                .from('employee-documents')
+                .getPublicUrl(storagePath);
+            
+            debugPrint('Education document uploaded for profile $profileId: $storagePath');
+          } catch (uploadError) {
+            debugPrint('Error uploading education document: $uploadError');
+          }
+        }
+
+        // Insert education entry with document URL
+        await SupabaseConfig.client
+            .from('education_entries')
+            .insert({
+              'employee_profile_id': profileId,
+              'level_of_education': e.level,
+              'institution': e.institution,
+              'degree': e.degree,
+              'year': e.year,
+              'grade': e.grade,
+              'document_name': e.documentName,
+              'document_url': documentUrl,
+            });
+      }
+    } catch (e) {
+      debugPrint('Error updating education entries for profile: $e');
+    }
+  }
+
+  /// Update employment history for a specific profile ID (for HR use)
+  Future<void> _updateEmploymentHistoryForProfile(
+    String profileId,
+    List<EmployeeEmploymentEntry> entries,
+  ) async {
+    try {
+      // Delete existing entries
+      await SupabaseConfig.client
+          .from('employment_entries')
+          .delete()
+          .eq('employee_profile_id', profileId);
+
+      // Insert new entries with document upload
+      for (final e in entries) {
+        String? documentUrl;
+
+        // Upload document to storage if bytes exist
+        if (e.documentBytes != null && e.documentName != null) {
+          try {
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final storagePath = '$profileId/employment/${timestamp}_${e.documentName}';
+            
+            await SupabaseConfig.client.storage
+                .from('employee-documents')
+                .uploadBinary(storagePath, e.documentBytes!, fileOptions: FileOptions(upsert: true));
+            
+            documentUrl = SupabaseConfig.client.storage
+                .from('employee-documents')
+                .getPublicUrl(storagePath);
+            
+            debugPrint('Employment document uploaded for profile $profileId: $storagePath');
+          } catch (uploadError) {
+            debugPrint('Error uploading employment document: $uploadError');
+          }
+        }
+
+        // Insert employment entry with document URL
+        await SupabaseConfig.client
+            .from('employment_entries')
+            .insert({
+              'employee_profile_id': profileId,
+              'company_name': e.companyName,
+              'designation': e.designation,
+              'from_date': e.fromDate?.toIso8601String(),
+              'to_date': e.toDate?.toIso8601String(),
+              'document_name': e.documentName,
+              'document_url': documentUrl,
+            });
+      }
+    } catch (e) {
+      debugPrint('Error updating employment history for profile: $e');
     }
   }
 

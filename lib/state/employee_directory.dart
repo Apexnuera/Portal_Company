@@ -329,9 +329,18 @@ class EmployeeDirectory extends ChangeNotifier {
     notifyListeners();
     
     // Sync to Supabase
-    EmployeeProfileService.instance.updateProfessionalProfile(profile).catchError((e) {
-      debugPrint('Failed to sync professional profile to Supabase: $e');
-    });
+    final currentProfile = EmployeeProfileService.instance.currentProfile;
+    if (currentProfile != null && currentProfile.id == id) {
+      // Updating own profile
+      EmployeeProfileService.instance.updateProfessionalProfile(profile).catchError((e) {
+        debugPrint('Failed to sync professional profile to Supabase: $e');
+      });
+    } else {
+      // Updating another employee's profile (HR mode)
+      EmployeeProfileService.instance.updateProfessionalProfileForEmployee(id, profile).catchError((e) {
+        debugPrint('Failed to sync professional profile to Supabase (HR): $e');
+      });
+    }
   }
 
   void updateCompensation(String id, CompensationInfo data) {

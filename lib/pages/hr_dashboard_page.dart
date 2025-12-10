@@ -4236,13 +4236,13 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelect(_HRMenu.queries),
           ),
           ListTile(
-            leading: Icon(
+            leading: const Icon(
               Icons.campaign_outlined,
-              color: hasActive ? Colors.red : const Color(0xFFFF782B),
+              color: Color(0xFFFF782B),
             ),
-            title: Text(
+            title: const Text(
               'Alerts',
-              style: TextStyle(color: hasActive ? Colors.red : null),
+              style: TextStyle(color: Colors.black),
             ),
             selected: selected == _HRMenu.alerts,
             onTap: () => onSelect(_HRMenu.alerts),
@@ -4303,17 +4303,6 @@ class _TopNav extends StatelessWidget {
             onPressed: () => onSelect(_HRMenu.queries),
             icon: const Icon(Icons.help_outline, color: Color(0xFFFF782B)),
             label: const Text('Help and Support'),
-          ),
-          TextButton.icon(
-            onPressed: () => onSelect(_HRMenu.alerts),
-            icon: Icon(
-              Icons.campaign_outlined,
-              color: hasActive ? Colors.red : const Color(0xFFFF782B),
-            ),
-            label: Text(
-              'Alerts',
-              style: TextStyle(color: hasActive ? Colors.red : null),
-            ),
           ),
           const SizedBox(width: 8),
           TextButton.icon(

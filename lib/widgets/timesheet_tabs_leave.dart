@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/timesheet_service.dart';
 import '../utils/document_picker.dart';
+import '../utils/document_viewer.dart';
 
 class LeaveRequestTab extends StatefulWidget {
   const LeaveRequestTab({super.key, required this.employeeId, required this.isHrMode});
@@ -281,17 +284,37 @@ class _LeaveRequestTabState extends State<LeaveRequestTab> {
                 ),
                 const Divider(height: 24),
                 Text('Reason: ${request.reason}'),
-                if (request.documentName != null) ...[
+                if (request.documentName != null && request.documentBytes != null) ...[
                   const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () { /* Add document view logic here */ },
-                    child: Row(
-                      children: [
-                        Icon(Icons.attach_file, size: 18, color: Theme.of(context).primaryColor),
-                        const SizedBox(width: 8),
-                        Text(request.documentName!, style: TextStyle(fontStyle: FontStyle.italic, color: Theme.of(context).primaryColor)),
-                      ],
-                    ),
+                  Row(
+                    children: [
+                      Icon(Icons.attach_file, size: 18, color: Theme.of(context).primaryColor),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          request.documentName!,
+                          style: TextStyle(fontStyle: FontStyle.italic, color: Theme.of(context).primaryColor),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () async {
+                          final opened = await openDocumentBytes(
+                            bytes: Uint8List.fromList(request.documentBytes!),
+                            fileName: request.documentName!,
+                          );
+                          if (!opened && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Document preview not supported on this platform.')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.visibility_outlined),
+                        tooltip: 'View Document',
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ],
                   ),
                 ],
                 if (widget.isHrMode && request.status == 'Pending') ...[

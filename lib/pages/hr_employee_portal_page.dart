@@ -1413,7 +1413,7 @@ class _TimeSheetEditor extends StatelessWidget {
             children: ts.wfhRequests
                 .map((w) => ListTile(
                       leading: const Icon(Icons.home_work_outlined),
-                      title: Text(ts.formatDate(w.date)),
+                      title: Text('${ts.formatDate(w.startDate)} - ${ts.formatDate(w.endDate)} (${w.totalDays} day${w.totalDays > 1 ? "s" : ""})'),
                       subtitle: Text(w.reason),
                       trailing: Text(w.status),
                     ))

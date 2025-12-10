@@ -14,7 +14,8 @@ class _WFHRequestFormState extends State<WFHRequestForm> {
   final _formKey = GlobalKey<FormState>();
   final _reasonController = TextEditingController();
   
-  DateTime? _selectedDate;
+  DateTime? _startDate;
+  DateTime? _endDate;
 
   @override
   void dispose() {
@@ -22,7 +23,7 @@ class _WFHRequestFormState extends State<WFHRequestForm> {
     super.dispose();
   }
 
-  Future<void> _selectDate(BuildContext context) async {
+  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now().add(const Duration(days: 1)),
@@ -42,15 +43,23 @@ class _WFHRequestFormState extends State<WFHRequestForm> {
 
     if (picked != null) {
       setState(() {
-        _selectedDate = picked;
+        if (isStartDate) {
+          _startDate = picked;
+          if (_endDate != null && _endDate!.isBefore(picked)) {
+            _endDate = null;
+          }
+        } else {
+          _endDate = picked;
+        }
       });
     }
   }
 
   Future<void> _submitWFHRequest() async {
-    if (_formKey.currentState!.validate() && _selectedDate != null) {
+    if (_formKey.currentState!.validate() && _startDate != null && _endDate != null) {
       final success = await widget.timeSheetService.submitWFHRequest(
-        date: _selectedDate!,
+        startDate: _startDate!,
+        endDate: _endDate!,
         reason: _reasonController.text,
       );
 
@@ -64,7 +73,8 @@ class _WFHRequestFormState extends State<WFHRequestForm> {
         
         // Clear form
         setState(() {
-          _selectedDate = null;
+          _startDate = null;
+          _endDate = null;
           _reasonController.clear();
         });
       }
@@ -93,24 +103,51 @@ class _WFHRequestFormState extends State<WFHRequestForm> {
           ),
           const SizedBox(height: 20),
           
-          // Date Selection
-          InkWell(
-            onTap: () => _selectDate(context),
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Work From Home Date',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.calendar_today),
-              ),
-              child: Text(
-                _selectedDate != null 
-                  ? widget.timeSheetService.formatDate(_selectedDate!)
-                  : 'Select date for WFH',
-                style: TextStyle(
-                  color: _selectedDate != null ? Colors.black87 : Colors.grey.shade600,
+          // Date Selection Row
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => _selectDate(context, true),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Start Date',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.calendar_today),
+                    ),
+                    child: Text(
+                      _startDate != null 
+                        ? widget.timeSheetService.formatDate(_startDate!)
+                        : 'Select start date',
+                      style: TextStyle(
+                        color: _startDate != null ? Colors.black87 : Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: InkWell(
+                  onTap: () => _selectDate(context, false),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'End Date',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.calendar_today),
+                    ),
+                    child: Text(
+                      _endDate != null 
+                        ? widget.timeSheetService.formatDate(_endDate!)
+                        : 'Select end date',
+                      style: TextStyle(
+                        color: _endDate != null ? Colors.black87 : Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           
           const SizedBox(height: 16),

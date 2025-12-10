@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../services/timesheet_service.dart';
+import '../utils/document_picker.dart';
 
 class LeaveRequestForm extends StatefulWidget {
   final TimeSheetService timeSheetService;
@@ -17,11 +20,23 @@ class _LeaveRequestFormState extends State<LeaveRequestForm> {
   DateTime? _startDate;
   DateTime? _endDate;
   String? _selectedLeaveType;
+  Uint8List? _uploadedDocument;
+  String? _documentName;
 
   @override
   void dispose() {
     _reasonController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickDocument() async {
+    final doc = await pickDocument(context);
+    if (doc != null && mounted) {
+      setState(() {
+        _uploadedDocument = doc.data;
+        _documentName = doc.name;
+      });
+    }
   }
 
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
@@ -62,11 +77,25 @@ class _LeaveRequestFormState extends State<LeaveRequestForm> {
         _endDate != null && 
         _selectedLeaveType != null) {
       
+      // Validate document upload for Sick Leave
+      if (_selectedLeaveType == 'Sick Leave' && _uploadedDocument == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please upload a medical certificate for sick leave'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
       final success = await widget.timeSheetService.submitLeaveRequest(
         startDate: _startDate!,
         endDate: _endDate!,
         leaveType: _selectedLeaveType!,
         reason: _reasonController.text,
+        document: _uploadedDocument != null && _documentName != null
+            ? {'name': _documentName, 'data': _uploadedDocument}
+            : null,
       );
 
       if (success && mounted) {
@@ -82,6 +111,8 @@ class _LeaveRequestFormState extends State<LeaveRequestForm> {
           _startDate = null;
           _endDate = null;
           _selectedLeaveType = null;
+          _uploadedDocument = null;
+          _documentName = null;
           _reasonController.clear();
         });
       }
@@ -188,6 +219,89 @@ class _LeaveRequestFormState extends State<LeaveRequestForm> {
           ),
           
           const SizedBox(height: 16),
+          
+          // Document Upload (only for Sick Leave)
+          if (_selectedLeaveType == 'Sick Leave') ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _uploadedDocument == null 
+                      ? Colors.orange.withValues(alpha: 0.5)
+                      : Colors.green.withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _uploadedDocument == null 
+                            ? Icons.upload_file_outlined 
+                            : Icons.check_circle_outlined,
+                        color: _uploadedDocument == null 
+                            ? const Color(0xFFFF782B) 
+                            : Colors.green,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _uploadedDocument == null
+                              ? 'Medical Certificate Required *'
+                              : 'Document Uploaded: $_documentName',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _uploadedDocument == null 
+                                ? Colors.orange.shade800 
+                                : Colors.green.shade800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _pickDocument,
+                      icon: Icon(
+                        _uploadedDocument == null 
+                            ? Icons.attach_file 
+                            : Icons.refresh,
+                      ),
+                      label: Text(
+                        _uploadedDocument == null 
+                            ? 'Upload Medical Certificate' 
+                            : 'Change Document',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF782B),
+                        side: const BorderSide(color: Color(0xFFFF782B)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  if (_uploadedDocument == null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please attach a medical certificate or doctor\'s note for sick leave',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           
           // Reason Text Field
           TextFormField(

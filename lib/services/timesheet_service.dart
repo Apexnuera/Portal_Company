@@ -71,7 +71,8 @@ class LeaveRequest {
 
 class WFHRequest {
   final String id;
-  final DateTime date;
+  final DateTime startDate;
+  final DateTime endDate;
   final String reason;
   String status; // 'Pending', 'Approved', 'Rejected'
   final DateTime submittedDate;
@@ -80,13 +81,18 @@ class WFHRequest {
 
   WFHRequest({
     required this.id,
-    required this.date,
+    required this.startDate,
+    required this.endDate,
     required this.reason,
     required this.status,
     required this.submittedDate,
     this.approvedDate,
     this.approverComments,
   });
+
+  int get totalDays {
+    return endDate.difference(startDate).inDays + 1;
+  }
 }
 
 class Holiday {
@@ -261,13 +267,15 @@ class TimeSheetService extends ChangeNotifier {
 
   // Submit WFH Request
   Future<bool> submitWFHRequest({
-    required DateTime date,
+    required DateTime startDate,
+    required DateTime endDate,
     required String reason,
   }) async {
     try {
       final request = WFHRequest(
         id: 'WFH-${DateTime.now().millisecondsSinceEpoch}',
-        date: date,
+        startDate: startDate,
+        endDate: endDate,
         reason: reason,
         status: 'Pending',
         submittedDate: DateTime.now(),

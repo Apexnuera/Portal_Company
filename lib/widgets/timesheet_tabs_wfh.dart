@@ -34,7 +34,7 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
 
   Future<void> _submitWFHRequest() async {
     final ts = Provider.of<TimeSheetService>(context, listen: false);
-    final ok = await ts.submitWFHRequest(date: _wfhDate!, reason: _wfhReasonController.text.trim());
+    final ok = await ts.submitWFHRequest(startDate: _wfhDate!, endDate: _wfhDate!, reason: _wfhReasonController.text.trim());
     if (ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WFH request submitted successfully')));
       setState(() {
@@ -148,8 +148,8 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
   Widget _buildWFHRequestsList(TimeSheetService ts) {
     var requests = ts.wfhRequests;
     if (widget.isHrMode) {
-      if (_filterYear != null) requests = requests.where((r) => r.date.year == _filterYear).toList();
-      if (_filterMonth != null) requests = requests.where((r) => r.date.month == _filterMonth).toList();
+      if (_filterYear != null) requests = requests.where((r) => r.startDate.year == _filterYear).toList();
+      if (_filterMonth != null) requests = requests.where((r) => r.startDate.month == _filterMonth).toList();
     }
 
     if (requests.isEmpty) {
@@ -178,7 +178,7 @@ class _WFHRequestTabState extends State<WFHRequestTab> {
                         children: [
                           const Text('Work From Home Request', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text(ts.formatDate(request.date), style: TextStyle(color: Colors.grey.shade700)),
+                          Text('${ts.formatDate(request.startDate)} - ${ts.formatDate(request.endDate)} (${request.totalDays} day${request.totalDays > 1 ? "s" : ""})', style: TextStyle(color: Colors.grey.shade700)),
                         ],
                       ),
                     ),
