@@ -270,11 +270,19 @@ class PostStore extends ChangeNotifier {
     }
   }
 
-  JobPost? getJobById(String id) {
+  JobPost? getJobById(String idOrReference) {
+    // First try to match by primary ID
     try {
-      return _jobs.firstWhere((j) => j.id == id);
+      return _jobs.firstWhere((j) => j.id == idOrReference);
     } catch (_) {
-      return null;
+      // Fallback: match by referenceCode (HR-defined Job ID)
+      try {
+        return _jobs.firstWhere(
+          (j) => j.referenceCode != null && j.referenceCode == idOrReference,
+        );
+      } catch (_) {
+        return null;
+      }
     }
   }
 

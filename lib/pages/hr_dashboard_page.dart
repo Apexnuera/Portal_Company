@@ -769,6 +769,7 @@ class _EmployeeRecord {
   final String name;
   final String email;
   final String password;
+  final String? authUserId; // Added for Supabase operations
   final _EmployeeProfileData profile;
 
   const _EmployeeRecord({
@@ -776,6 +777,7 @@ class _EmployeeRecord {
     required this.name,
     required this.email,
     required this.password,
+    this.authUserId,
     required this.profile,
   });
 
@@ -784,6 +786,7 @@ class _EmployeeRecord {
     String? name,
     String? email,
     String? password,
+    String? authUserId,
     _EmployeeProfileData? profile,
   }) {
     return _EmployeeRecord(
@@ -791,6 +794,7 @@ class _EmployeeRecord {
       name: name ?? this.name,
       email: email ?? this.email,
       password: password ?? this.password,
+      authUserId: authUserId ?? this.authUserId,
       profile: profile ?? this.profile.clone(),
     );
   }
@@ -988,6 +992,7 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
           name: fullName,
           email: email,
           password: '********', // Password not returned from DB for security
+          authUserId: emp['auth_user_id'], // Store for delete operation
           profile: _EmployeeProfileData.empty(),
         );
         _data.addEmployee(record);
@@ -1237,10 +1242,37 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                                   );
                                   if (!context.mounted) return;
                                   if (updatedRecord != null) {
-                                    _data.updateEmployee(record, updatedRecord);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Employee "${updatedRecord.name}" updated.')),
+                                    // Update in Supabase
+                                    final error = await EmployeeManagementService.instance.updateEmployee(
+                                      employeeId: updatedRecord.id,
+                                      updates: {
+                                        'full_name': updatedRecord.name,
+                                        'corporate_email': updatedRecord.email,
+                                      },
                                     );
+                                    
+                                    if (!context.mounted) return;
+                                    
+                                    if (error == null) {
+                                      // Update local state only if Supabase update succeeds
+                                      _data.updateEmployee(record, updatedRecord);
+                                      // Also update in global directory
+                                      final globalEmployee = context.read<EmployeeDirectory>().tryGetById(record.id);
+                                      if (globalEmployee != null) {
+                                        globalEmployee.name = updatedRecord.name;
+                                        globalEmployee.primaryEmail = updatedRecord.email;
+                                        globalEmployee.personal.fullName = updatedRecord.name;
+                                        globalEmployee.personal.corporateEmail = updatedRecord.email;
+                                        context.read<EmployeeDirectory>().touchEmployee(record.id);
+                                      }
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Employee "${updatedRecord.name}" updated successfully.')),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Failed to update: $error'), backgroundColor: Colors.red),
+                                      );
+                                    }
                                   }
                                 },
                                 onDelete: (record) async {
@@ -1248,7 +1280,7 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                                     context: context,
                                     builder: (context) => AlertDialog(
                                       title: const Text('Delete Employee'),
-                                      content: Text('Are you sure you want to delete ${record.name}?'),
+                                      content: Text('Are you sure you want to delete ${record.name}?\n\nThis action cannot be undone.'),
                                       actions: [
                                         TextButton(
                                           onPressed: () => Navigator.of(context).pop(false),
@@ -1256,7 +1288,7 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                                         ),
                                         ElevatedButton(
                                           onPressed: () => Navigator.of(context).pop(true),
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                                           child: const Text('Delete'),
                                         ),
                                       ],
@@ -1264,10 +1296,45 @@ class _EmployeeDetailsModuleState extends State<_EmployeeDetailsModule> {
                                   );
                                   if (!context.mounted) return;
                                   if (confirmed == true) {
-                                    _data.removeEmployee(record);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Employee "${record.name}" deleted.')),
+                                    debugPrint('=== DELETE EMPLOYEE DEBUG ===');
+                                    debugPrint('Employee ID: ${record.id}');
+                                    debugPrint('Employee Name: ${record.name}');
+                                    debugPrint('Auth User ID: ${record.authUserId}');
+                                    
+                                    if (record.authUserId == null) {
+                                      debugPrint('ERROR: authUserId is null!');
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Cannot delete: Missing auth user ID'), backgroundColor: Colors.red),
+                                      );
+                                      return;
+                                    }
+                                    
+                                    debugPrint('Calling EmployeeManagementService.deleteEmployee...');
+                                    // Delete from Supabase
+                                    final error = await EmployeeManagementService.instance.deleteEmployee(
+                                      authUserId: record.authUserId!,
                                     );
+                                    
+                                    debugPrint('Delete result - Error: $error');
+                                    
+                                    if (!context.mounted) return;
+                                    
+                                    if (error == null) {
+                                      debugPrint('Delete successful, updating UI...');
+                                      // Remove from local state only if Supabase delete succeeds
+                                      _data.removeEmployee(record);
+                                      // Also remove from global directory
+                                      context.read<EmployeeDirectory>().removeEmployee(record.id);
+                                      debugPrint('UI updated successfully');
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Employee "${record.name}" deleted successfully.')),
+                                      );
+                                    } else {
+                                      debugPrint('Delete failed with error: $error');
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Failed to delete: $error'), backgroundColor: Colors.red),
+                                      );
+                                    }
                                   }
                                 },
                                 showTitle: false,
@@ -3579,7 +3646,7 @@ class _InternshipPostsList extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${internship.referenceCode ?? internship.id} • ${internship.duration} • ${internship.skill}',
+                          '${internship.contractType} • ${internship.qualification} • ${internship.skill}',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey.shade700,
@@ -4070,6 +4137,7 @@ class HRDashboardPage extends StatefulWidget {
 
 class _HRDashboardPageState extends State<HRDashboardPage> {
   _HRMenu _selected = _HRMenu.overview; // initial: overview/welcome
+  final _employeeDirectory = EmployeeDirectory(); // Create once and reuse
 
   @override
   void initState() {
@@ -4077,6 +4145,75 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
     // Fetch data from Supabase
     PostStore.I.fetchPosts();
     ApplicationStore.I.fetchApplications();
+    // Load employees for the Overview metrics
+    _loadEmployees();
+  }
+
+  Future<void> _loadEmployees() async {
+    try {
+      final employees = await EmployeeManagementService.instance.getEmployees();
+      
+      if (!mounted) return;
+      
+      for (final emp in employees) {
+        final employeeId = emp['employee_id'] ?? '';
+        final fullName = emp['full_name'] ?? '';
+        final email = emp['corporate_email'] ?? '';
+        
+        // Try to load full profile with profile picture
+        final globalRecord = await EmployeeProfileService.instance.loadEmployeeProfileById(employeeId);
+        
+        if (globalRecord != null) {
+          _employeeDirectory.addEmployee(globalRecord);
+        } else {
+          // Fallback: create basic record
+          final fallbackRecord = EmployeeRecord(
+            id: employeeId,
+            name: fullName,
+            primaryEmail: email,
+            personal: EmployeePersonalDetails(
+              fullName: fullName,
+              familyName: emp['family_name'] ?? '',
+              corporateEmail: email,
+              personalEmail: emp['personal_email'] ?? '',
+              mobileNumber: emp['mobile_number'] ?? '',
+              alternateMobileNumber: emp['alternate_mobile_number'] ?? '',
+              currentAddress: emp['current_address'] ?? '',
+              permanentAddress: emp['permanent_address'] ?? '',
+              panId: emp['pan_id'] ?? '',
+              aadharId: emp['aadhar_id'] ?? '',
+              dateOfBirth: emp['date_of_birth'] != null 
+                  ? DateTime.parse(emp['date_of_birth']) 
+                  : null,
+              bloodGroup: emp['blood_group'] ?? '',
+              otherAssets: '',
+              profileImageBytes: null,
+              assignedAssets: <String>{},
+            ),
+            professional: EmployeeProfessionalProfile(
+              position: emp['position'] ?? '',
+              employeeId: employeeId,
+              department: emp['department'] ?? '',
+              managerName: emp['manager_name'] ?? '',
+              employmentType: emp['employment_type'] ?? '',
+              location: emp['location'] ?? '',
+              workSpace: emp['workspace'] ?? '',
+              jobLevel: emp['job_level'] ?? '',
+              startDate: emp['start_date'] != null 
+                  ? DateTime.parse(emp['start_date']) 
+                  : null,
+              confirmationDate: emp['confirmation_date'] != null 
+                  ? DateTime.parse(emp['confirmation_date']) 
+                  : null,
+              skills: emp['skills'] ?? '',
+            ),
+          );
+          _employeeDirectory.addEmployee(fallbackRecord);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading employees in HR Dashboard: $e');
+    }
   }
 
 
@@ -4085,8 +4222,8 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
     final hasActive = context.watch<AlertService>().hasActive;
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<EmployeeDirectory>(
-          create: (_) => EmployeeDirectory(),
+        ChangeNotifierProvider<EmployeeDirectory>.value(
+          value: _employeeDirectory,
         ),
         ChangeNotifierProvider<PostStore>.value(value: PostStore.I),
         ChangeNotifierProvider<ApplicationStore>.value(
@@ -4099,22 +4236,6 @@ class _HRDashboardPageState extends State<HRDashboardPage> {
           backgroundColor: const Color(0xFFFF782B),
           foregroundColor: Colors.white,
           actions: [
-            TextButton.icon(
-              onPressed: () => setState(() => _selected = _HRMenu.alerts),
-              icon: Icon(
-                Icons.campaign_outlined,
-                color: hasActive ? Colors.redAccent : Colors.white,
-              ),
-              label: Text(
-                'Alerts',
-                style: TextStyle(
-                  color: hasActive ? Colors.redAccent : Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
-            ),
-            const SizedBox(width: 8),
             TextButton.icon(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -5182,6 +5303,142 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
     }
   }
 
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    String? hint,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: const Icon(Icons.edit_outlined, color: Color(0xFFFF782B)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        focusedBorder: const OutlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
+        ),
+      ),
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
+    );
+  }
+
+  Widget _buildMultiline(String label, TextEditingController controller) {
+    return TextFormField(
+      controller: controller,
+      maxLines: 5,
+      decoration: InputDecoration(
+        labelText: label,
+        alignLabelWithHint: true,
+        prefixIcon: const Icon(
+          Icons.description_outlined,
+          color: Color(0xFFFF782B),
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        focusedBorder: const OutlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
+        ),
+      ),
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
+    );
+  }
+
+  Widget _dropdownContractType() {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Contract Type',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        focusedBorder: const OutlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _contractType,
+          items: const [
+            DropdownMenuItem(value: 'Full-Time', child: Text('Full-Time')),
+            DropdownMenuItem(value: 'Part-Time', child: Text('Part-Time')),
+            DropdownMenuItem(value: 'Contract', child: Text('Contract')),
+            DropdownMenuItem(value: 'Temporary', child: Text('Temporary')),
+            DropdownMenuItem(value: 'Intern', child: Text('Intern')),
+          ],
+          onChanged: (v) => setState(() => _contractType = v ?? 'Full-Time'),
+        ),
+      ),
+    );
+  }
+
+  Widget _dateRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildDateField('Posting Date', _postingDate, allowPast: true),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildDateField('Application Deadline', _applicationDeadline),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField(
+    String label,
+    TextEditingController controller, {
+    bool allowPast = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      readOnly: true,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(
+          Icons.date_range_outlined,
+          color: Color(0xFFFF782B),
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        focusedBorder: const OutlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
+        ),
+      ),
+      onTap: () async {
+        final now = DateTime.now();
+        final firstDate = allowPast ? DateTime(now.year - 5) : now;
+        final picked = await showDatePicker(
+          context: context,
+          firstDate: firstDate,
+          lastDate: DateTime(now.year + 5),
+          initialDate: now,
+        );
+        if (picked != null) {
+          final s =
+              '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+          setState(() => controller.text = s);
+        }
+      },
+      validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Please select $label' : null,
+    );
+  }
+
+  List<String> _splitList(String input) {
+    return input
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  List<String> _splitLines(String input) {
+    return input
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Initialize defaults only if not editing
@@ -5428,7 +5685,6 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Removed "Manage Jobs" list from here
                   ],
                 ),
               ),
@@ -5438,14 +5694,72 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
       ),
     );
   }
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+}
+
+class _PostInternshipFormInline extends StatefulWidget {
+  final InternshipPost? internshipToEdit;
+  const _PostInternshipFormInline({this.internshipToEdit});
+  @override
+  State<_PostInternshipFormInline> createState() =>
+      _PostInternshipFormInlineState();
+}
+
+class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
+  final _formKey = GlobalKey<FormState>();
+  final _title = TextEditingController();
+  final _skill = TextEditingController();
+  final _qualification = TextEditingController();
+  final _duration = TextEditingController();
+  final _description = TextEditingController();
+  final _postingDate = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  String _contractType = 'Internship';
+  InternshipPost? _editingInternship;
+
+  void _populateForm(InternshipPost post) {
+    setState(() {
+      _editingInternship = post;
+      _title.text = post.title;
+      _skill.text = post.skill;
+      _qualification.text = post.qualification;
+      _duration.text = post.duration;
+      _description.text = post.description;
+      _postingDate.text = post.postingDate;
+      _contractType = post.contractType.isNotEmpty ? post.contractType : 'Internship';
+    });
+  }
+
+  void _clearForm() {
+    setState(() {
+      _editingInternship = null;
+      _title.clear();
+      _skill.clear();
+      _qualification.clear();
+      _duration.clear();
+      _description.clear();
+      _postingDate.clear();
+      _contractType = 'Internship';
+    });
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _skill.dispose();
+    _qualification.dispose();
+    _duration.dispose();
+    _description.dispose();
+    _postingDate.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.internshipToEdit != null) {
+      _populateForm(widget.internshipToEdit!);
+    }
   }
 
   Widget _buildField(
@@ -5490,45 +5804,6 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
     );
   }
 
-  Widget _dropdownContractType() {
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: 'Contract Type',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
-        ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _contractType,
-          items: const [
-            DropdownMenuItem(value: 'Full-Time', child: Text('Full-Time')),
-            DropdownMenuItem(value: 'Part-Time', child: Text('Part-Time')),
-            DropdownMenuItem(value: 'Contract', child: Text('Contract')),
-            DropdownMenuItem(value: 'Temporary', child: Text('Temporary')),
-            DropdownMenuItem(value: 'Intern', child: Text('Intern')),
-          ],
-          onChanged: (v) => setState(() => _contractType = v ?? 'Full-Time'),
-        ),
-      ),
-    );
-  }
-
-  Widget _dateRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildDateField('Posting Date', _postingDate, allowPast: true),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildDateField('Application Deadline', _applicationDeadline),
-        ),
-      ],
-    );
-  }
-
   Widget _buildDateField(
     String label,
     TextEditingController controller, {
@@ -5566,89 +5841,6 @@ class _PostJobFormInlineState extends State<_PostJobFormInline> {
       validator: (v) =>
           (v == null || v.trim().isEmpty) ? 'Please select $label' : null,
     );
-  }
-
-  List<String> _splitList(String input) {
-    return input
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-  }
-
-  List<String> _splitLines(String input) {
-    return input
-        .split('\n')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-  }
-}
-
-class _PostInternshipFormInline extends StatefulWidget {
-  final InternshipPost? internshipToEdit;
-  const _PostInternshipFormInline({this.internshipToEdit});
-  @override
-  State<_PostInternshipFormInline> createState() =>
-      _PostInternshipFormInlineState();
-}
-
-class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
-  final _formKey = GlobalKey<FormState>();
-  final _title = TextEditingController();
-  final _skill = TextEditingController();
-  final _qualification = TextEditingController();
-  final _duration = TextEditingController();
-  final _description = TextEditingController();
-  final _postingDate = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  // Removed: Location, Contract Type, Internship ID as per requirements
-  InternshipPost? _editingInternship;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.internshipToEdit != null) {
-      _populateForm(widget.internshipToEdit!);
-    }
-  }
-
-  void _populateForm(InternshipPost post) {
-    setState(() {
-      _editingInternship = post;
-      _title.text = post.title;
-      _skill.text = post.skill;
-      _qualification.text = post.qualification;
-      _duration.text = post.duration;
-      _description.text = post.description;
-      _postingDate.text = post.postingDate;
-    });
-    // _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-    // Don't animate in initState
-  }
-
-  void _clearForm() {
-    setState(() {
-      _editingInternship = null;
-      _title.clear();
-      _skill.clear();
-      _qualification.clear();
-      _duration.clear();
-      _description.clear();
-      _postingDate.clear();
-    });
-  }
-
-  @override
-  void dispose() {
-    _title.dispose();
-    _skill.dispose();
-    _qualification.dispose();
-    _duration.dispose();
-    _description.dispose();
-    _postingDate.dispose();
-    _scrollController.dispose();
-    super.dispose();
   }
 
   @override
@@ -5711,21 +5903,41 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                               Row(
                                 children: [
                                   Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      decoration: InputDecoration(
+                                        labelText: 'Contract Type',
+                                        prefixIcon: const Icon(Icons.category_outlined, color: Color(0xFFFF782B)),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        focusedBorder: const OutlineInputBorder(
+                                          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
+                                        ),
+                                      ),
+                                      value: _contractType,
+                                      items: const [
+                                        DropdownMenuItem(value: 'Internship', child: Text('Internship')),
+                                        DropdownMenuItem(value: 'Full-Time', child: Text('Full-Time')),
+                                        DropdownMenuItem(value: 'Part-Time', child: Text('Part-Time')),
+                                        DropdownMenuItem(value: 'Contract', child: Text('Contract')),
+                                        DropdownMenuItem(value: 'Temporary', child: Text('Temporary')),
+                                      ],
+                                      onChanged: (v) => setState(() => _contractType = v ?? 'Internship'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
                                     child: _buildField(
                                       'Skill',
                                       _skill,
                                       hint: 'Primary skill required',
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildField(
-                                      'Qualification',
-                                      _qualification,
-                                      hint: 'e.g., BSc, BTech',
-                                    ),
-                                  ),
                                 ],
+                              ),
+                              const SizedBox(height: 12),
+                              _buildField(
+                                'Qualification',
+                                _qualification,
+                                hint: 'e.g., BSc, BTech',
                               ),
                             ],
                           );
@@ -5738,6 +5950,26 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                               'Duration',
                               _duration,
                               hint: 'e.g., 3 months',
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              decoration: InputDecoration(
+                                labelText: 'Contract Type',
+                                prefixIcon: const Icon(Icons.category_outlined, color: Color(0xFFFF782B)),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                focusedBorder: const OutlineInputBorder(
+                                  borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
+                                ),
+                              ),
+                              value: _contractType,
+                              items: const [
+                                DropdownMenuItem(value: 'Internship', child: Text('Internship')),
+                                DropdownMenuItem(value: 'Full-Time', child: Text('Full-Time')),
+                                DropdownMenuItem(value: 'Part-Time', child: Text('Part-Time')),
+                                DropdownMenuItem(value: 'Contract', child: Text('Contract')),
+                                DropdownMenuItem(value: 'Temporary', child: Text('Temporary')),
+                              ],
+                              onChanged: (v) => setState(() => _contractType = v ?? 'Internship'),
                             ),
                             const SizedBox(height: 12),
                             _buildField(
@@ -5793,8 +6025,8 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                                     qualification: _qualification.text.trim(),
                                     duration: _duration.text.trim(),
                                     description: _description.text.trim(),
-                                    location: _editingInternship?.location ?? '',
-                                    contractType: _editingInternship?.contractType ?? '',
+                                    location: _editingInternship?.location ?? 'Remote', // Default to Remote if unknown
+                                    contractType: _contractType,
                                     postingDate: _postingDate.text.trim(),
                                   );
                                   
@@ -5829,7 +6061,6 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Removed "Manage Internships" list from here
                   ],
                 ),
               ),
@@ -5837,96 +6068,6 @@ class _PostInternshipFormInlineState extends State<_PostInternshipFormInline> {
           ),
         ),
       ),
-    );
-  }
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildField(
-    String label,
-    TextEditingController controller, {
-    String? hint,
-  }) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: const Icon(Icons.edit_outlined, color: Color(0xFFFF782B)),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
-        ),
-      ),
-      validator: (v) =>
-          (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
-    );
-  }
-
-  Widget _buildMultiline(String label, TextEditingController controller) {
-    return TextFormField(
-      controller: controller,
-      maxLines: 5,
-      decoration: InputDecoration(
-        labelText: label,
-        alignLabelWithHint: true,
-        prefixIcon: const Icon(
-          Icons.description_outlined,
-          color: Color(0xFFFF782B),
-        ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
-        ),
-      ),
-      validator: (v) =>
-          (v == null || v.trim().isEmpty) ? 'Please enter $label' : null,
-    );
-  }
-
-  Widget _buildDateField(
-    String label,
-    TextEditingController controller, {
-    bool allowPast = false,
-  }) {
-    return TextFormField(
-      controller: controller,
-      readOnly: true,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: const Icon(
-          Icons.date_range_outlined,
-          color: Color(0xFFFF782B),
-        ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFFF782B), width: 2),
-        ),
-      ),
-      onTap: () async {
-        final now = DateTime.now();
-        final firstDate = allowPast ? DateTime(now.year - 5) : now;
-        final picked = await showDatePicker(
-          context: context,
-          firstDate: firstDate,
-          lastDate: DateTime(now.year + 5),
-          initialDate: now,
-        );
-        if (picked != null) {
-          final s =
-              '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-          setState(() => controller.text = s);
-        }
-      },
-      validator: (v) =>
-          (v == null || v.trim().isEmpty) ? 'Please select $label' : null,
     );
   }
 }

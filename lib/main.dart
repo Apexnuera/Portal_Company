@@ -115,6 +115,20 @@ class MyApp extends StatelessWidget {
               JobApplicationSuccessPage(jobId: state.pathParameters['jobId']!),
         ),
         GoRoute(
+          path: '/internships/apply/:internshipId',
+          builder: (_, state) => JobApplicationFormPage(
+            jobId: state.pathParameters['internshipId']!,
+            isInternship: true,
+          ),
+        ),
+        GoRoute(
+          path: '/internships/apply/:internshipId/success',
+          builder: (_, state) => JobApplicationSuccessPage(
+            jobId: state.pathParameters['internshipId']!,
+            isInternship: true,
+          ),
+        ),
+        GoRoute(
           path: '/internships',
           builder: (_, __) => const InternshipsListingPage(),
         ),

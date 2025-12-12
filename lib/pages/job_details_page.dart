@@ -228,7 +228,10 @@ class JobDetailsPage extends StatelessWidget {
             _factRow(Icons.hourglass_bottom_outlined, 'Application Deadline', job.applicationDeadline),
             const Divider(height: 24),
             _sectionTitle('Job ID'),
-            Text(job.id, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              job.referenceCode ?? job.id,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
       ),

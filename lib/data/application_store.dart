@@ -124,13 +124,23 @@ class ApplicationStore extends ChangeNotifier {
 
   Future<void> addJobApplication(JobApplication a) async {
     try {
-      final response = await SupabaseConfig.client
-          .from('job_applications')
-          .insert(a.toJson())
-          .select()
-          .single();
-      _jobApps.insert(0, JobApplication.fromJson(response));
-      notifyListeners();
+      // Try insert with select first
+      try {
+        final response = await SupabaseConfig.client
+            .from('job_applications')
+            .insert(a.toJson())
+            .select()
+            .single();
+        _jobApps.insert(0, JobApplication.fromJson(response));
+        notifyListeners();
+      } catch (selectError) {
+        // If select fails (RLS may prevent reading), try insert only
+        await SupabaseConfig.client
+            .from('job_applications')
+            .insert(a.toJson());
+        // Application was inserted successfully, just can't read it back
+        debugPrint('Job application inserted (without read-back due to RLS)');
+      }
     } catch (e) {
       debugPrint('Error adding job application: $e');
       rethrow;
@@ -139,13 +149,23 @@ class ApplicationStore extends ChangeNotifier {
 
   Future<void> addInternshipApplication(InternshipApplication a) async {
     try {
-      final response = await SupabaseConfig.client
-          .from('internship_applications')
-          .insert(a.toJson())
-          .select()
-          .single();
-      _internApps.insert(0, InternshipApplication.fromJson(response));
-      notifyListeners();
+      // Try insert with select first
+      try {
+        final response = await SupabaseConfig.client
+            .from('internship_applications')
+            .insert(a.toJson())
+            .select()
+            .single();
+        _internApps.insert(0, InternshipApplication.fromJson(response));
+        notifyListeners();
+      } catch (selectError) {
+        // If select fails (RLS may prevent reading), try insert only
+        await SupabaseConfig.client
+            .from('internship_applications')
+            .insert(a.toJson());
+        // Application was inserted successfully, just can't read it back
+        debugPrint('Internship application inserted (without read-back due to RLS)');
+      }
     } catch (e) {
       debugPrint('Error adding internship application: $e');
       rethrow;

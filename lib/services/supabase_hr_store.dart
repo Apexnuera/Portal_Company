@@ -167,6 +167,8 @@ class SupabaseHRStore extends ChangeNotifier {
     required String skill,
     required String qualification,
     required String description,
+    required String location,
+    required String contractType,
     required String postingDate,
   }) async {
     try {
@@ -177,6 +179,8 @@ class SupabaseHRStore extends ChangeNotifier {
         skill: skill,
         qualification: qualification,
         description: description,
+        location: location,
+        contractType: contractType,
         postingDate: postingDate,
       );
 

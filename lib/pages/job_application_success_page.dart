@@ -3,7 +3,13 @@ import '../widgets/app_header_clean.dart';
 
 class JobApplicationSuccessPage extends StatelessWidget {
   final String jobId;
-  const JobApplicationSuccessPage({super.key, required this.jobId});
+  final bool isInternship;
+
+  const JobApplicationSuccessPage({
+    super.key,
+    required this.jobId,
+    this.isInternship = false,
+  });
 
   @override
   Widget build(BuildContext context) {

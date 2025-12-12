@@ -79,7 +79,7 @@ class InternshipDetailsPage extends StatelessWidget {
                               SizedBox(
                                 height: 46,
                                 child: ElevatedButton(
-                                  onPressed: () => context.push('/jobs/apply/${data.id}'),
+                                  onPressed: () => context.push('/internships/apply/${data.id}'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFFFF782B),
                                     foregroundColor: Colors.white,

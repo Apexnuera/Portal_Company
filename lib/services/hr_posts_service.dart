@@ -121,6 +121,8 @@ class HRPostsService {
     required String skill,
     required String qualification,
     required String description,
+    required String location,
+    required String contractType,
     required String postingDate,
   }) async {
     try {
@@ -133,6 +135,8 @@ class HRPostsService {
             'skill': skill,
             'qualification': qualification,
             'description': description,
+            'location': location,
+            'contract_type': contractType,
             'posting_date': postingDate,
             'created_by': _supabase.auth.currentUser?.id,
           })
